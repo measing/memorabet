@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemoraBet</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="auth-modal" class="nickname-modal">
+    <div class="nickname-box auth-box">
+      <img src="assets/logo.png" alt="MemoraBet" class="modal-logo" />
+      <h2>Cuenta MemoraBet</h2>
+      <p>Crea tu cuenta o inicia sesión para guardar saldo, historial y ranking en línea.</p>
+
+      <div class="auth-tabs">
+        <button id="tab-login" class="auth-tab active" type="button">Ingresar</button>
+        <button id="tab-register" class="auth-tab" type="button">Crear cuenta</button>
+      </div>
+
+      <input type="email" id="auth-email" placeholder="Correo electrónico" autocomplete="email" />
+      <input type="password" id="auth-password" placeholder="Contraseña" autocomplete="current-password" />
+      <input type="text" id="auth-nickname" placeholder="Nickname único" maxlength="16" autocomplete="off" />
+
+      <button id="auth-submit" class="btn btn-green">Ingresar</button>
+      <div id="nickname-error"></div>
+    </div>
+  </div>
+
+  <main class="app-shell">
+    <aside class="left-panel">
+      <section class="mini-stats card-panel">
+        <div class="mini-row">
+          <span class="icon green">✓</span>
+          <div><p>Pares encontrados</p><strong id="pares">0 / 8</strong></div>
+        </div>
+        <div class="mini-row">
+          <span class="icon blue">◎</span>
+          <div><p>Intentos restantes</p><strong id="intentos">10</strong></div>
+        </div>
+        <div class="mini-row">
+          <span class="icon gold">$</span>
+          <div><p>Saldo actual</p><strong id="ganancia" class="success">$2.000</strong></div>
+        </div>
+      </section>
+
+      <section class="prize-box card-panel">
+        <p>Premio por par</p>
+        <strong>$300</strong>
+        <div class="coin-stack">🪙🪙🪙</div>
+      </section>
+
+      <section class="rules card-panel">
+        <h3>📖 Reglas</h3>
+        <ul>
+          <li>Encuentra todos los pares.</li>
+          <li>Tienes 10 intentos.</li>
+          <li>Cada par vale $300.</li>
+          <li>Costo de entrada: $500.</li>
+        </ul>
+      </section>
+
+      <button class="btn btn-green big-btn" id="btn-new">▶ Nueva partida</button>
+      <button class="btn btn-red big-btn" id="btn-reset">↻ Reiniciar juego</button>
+    </aside>
+
+    <section class="center-stage">
+      <header class="brand-header">
+        <img src="assets/logo.png" alt="Logo MemoraBet" class="game-logo" />
+      </header>
+
+      <div id="msg" class="message info visible">Inicia sesión o crea una cuenta para comenzar.</div>
+
+      <section class="board-wrapper">
+        <div class="board" id="board"></div>
+      </section>
+
+      <div class="bottom-banner">⭐ Encuentra los 8 pares y maximiza tu ganancia ⭐</div>
+    </section>
+
+    <aside class="right-panel">
+      <section class="profile-card card-panel">
+        <div class="avatar">👤</div>
+        <div class="profile-info">
+          <p>Nick:</p>
+          <h2 id="player-name">Jugador</h2>
+          <span>Mejor partida: <strong id="best-game">0/10</strong></span>
+          <button class="btn btn-blue" id="btn-change-user">Cambiar usuario</button>
+        </div>
+      </section>
+
+      <section class="live-card card-panel">
+        <div class="live-title">
+          <h3>Historial en vivo</h3>
+          <span>● En vivo</span>
+        </div>
+        <div id="live-history-list" class="live-list">
+          <p class="empty">Sin partidas registradas.</p>
+        </div>
+      </section>
+
+      <section class="history-card card-panel">
+        <h3>📊 Tu historial</h3>
+        <div class="history-grid">
+          <span>Partidas jugadas:</span><strong id="hist-games">0</strong>
+          <span>Pares promedio:</span><strong id="hist-avg">0.00</strong>
+          <span>Mejor partida:</span><strong id="hist-best">0/10</strong>
+          <span>Ganancia total:</span><strong id="hist-profit">$0</strong>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
