@@ -1,8 +1,8 @@
 import { listenAuthState, handleAuthSubmit, setAuthMode, logoutUser } from './auth.js';
 import { newGame, resetGame } from './game.js';
-import { listenLiveHistory } from './database.js';
+import { listenLiveHistory, listenLeaderboard } from './database.js';
 import { session } from './state.js';
-import { renderLiveHistoryList, updateStats } from './ui.js';
+import { renderLiveHistoryList, updateStats, renderLeaderboard } from './ui.js';
 
 function bindEvents(){
   document.getElementById('tab-login')?.addEventListener('click', () => setAuthMode('login'));
@@ -27,6 +27,11 @@ listenAuthState();
 listenLiveHistory(history => {
   session.cachedLiveHistory = history;
   renderLiveHistoryList(history);
+});
+
+listenLeaderboard(ranking => {
+  session.cachedLeaderboard = ranking;
+  renderLeaderboard(ranking);
 });
 
 setInterval(() => renderLiveHistoryList(), 5000);

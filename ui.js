@@ -107,11 +107,74 @@ export function renderUserStats(stats = {}){
   const best = Number(stats.best || 0);
   const profit = Number(stats.profit || 0);
 
-  document.getElementById('best-game').textContent = `${best}/${K_MAX}`;
+  document.getElementById('best-game').textContent = `${best}/${TOTAL_PAIRS}`;
   document.getElementById('hist-games').textContent = games;
   document.getElementById('hist-avg').textContent = games ? (totalPairs/games).toFixed(2) : '0.00';
-  document.getElementById('hist-best').textContent = `${best}/${K_MAX}`;
+  document.getElementById('hist-best').textContent = `${best}/${TOTAL_PAIRS}`;
   document.getElementById('hist-profit').textContent = formatMoney(profit);
+}
+
+
+export function setNewGameButtonBusy(isBusy, text = 'Preparando partida...'){
+  const btn = document.getElementById('btn-new');
+  if(!btn) return;
+  btn.disabled = !!isBusy;
+  btn.classList.toggle('btn-disabled', !!isBusy);
+  btn.textContent = isBusy ? text : '▶ Nueva partida';
+}
+
+export function formatDuration(ms){
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+export function showVictoryAnimation({ tiempoMs, intentos, premio }){
+  const old = document.getElementById('victory-overlay');
+  if(old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'victory-overlay';
+  overlay.className = 'victory-overlay';
+  overlay.innerHTML = `
+    <div class="confetti-layer">${Array.from({ length: 42 }, (_, i) => `<span style="--i:${i}">★</span>`).join('')}</div>
+    <div class="victory-box">
+      <div class="victory-trophy">🏆</div>
+      <h2>¡Felicidades!</h2>
+      <p>Encontraste los 8 pares.</p>
+      <div class="victory-prize">Premio ficticio: ${formatMoney(premio)}</div>
+      <div class="victory-details">
+        <span>Tiempo: <strong>${formatDuration(tiempoMs)}</strong></span>
+        <span>Intentos: <strong>${intentos}</strong></span>
+      </div>
+      <button class="btn btn-green" id="victory-close">Cerrar</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('victory-close')?.addEventListener('click', () => overlay.remove());
+  setTimeout(() => overlay.classList.add('show'), 20);
+}
+
+export function renderLeaderboard(ranking = session.cachedLeaderboard){
+  const list = document.getElementById('leaderboard-list');
+  if(!list) return;
+  if(!ranking.length){
+    list.innerHTML = '<p class="empty">Aún nadie completa los 8 pares.</p>';
+    return;
+  }
+
+  list.innerHTML = ranking.map((item, idx) => {
+    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+    const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
+    return `<div class="ranking-item">
+      <div class="ranking-pos">${medal}</div>
+      <div>
+        <div class="ranking-name ${isCurrent ? 'current':''}">${escapeHTML(item.user || 'Jugador')}</div>
+        <div class="ranking-meta">${formatDuration(Number(item.tiempoMs || 0))} · ${Number(item.intentos || 0)} intentos</div>
+      </div>
+      <div class="ranking-prize">${formatMoney(Number(item.premio || 10000))}</div>
+    </div>`;
+  }).join('');
 }
 
 export function renderLiveHistoryList(history = session.cachedLiveHistory){

@@ -1,49 +1,104 @@
 import { EMOJIS, K_MAX, TOTAL_PAIRS, G, C, INITIAL_SALDO } from './constants.js';
 import { gameState, session, resetGameState } from './state.js';
 import { shuffle, wait, formatMoney } from './utils.js';
-import { updateSaldo, resetOnlineStats, addLiveHistory, updateUserStats } from './database.js';
-import { renderBoard, updateCardClasses, updateStats, showMsg, clearBoard, renderUserStats } from './ui.js';
+import { updateSaldo, resetOnlineStats, addLiveHistory, updateUserStats, addLeaderboardEntry } from './database.js';
+import { renderBoard, updateCardClasses, updateStats, showMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, formatDuration } from './ui.js';
+
+async function animateVisibleSwap(a, b){
+  const board = document.getElementById('board');
+  const cards = [...board.querySelectorAll('.card-wrap')];
+  const elA = cards[a];
+  const elB = cards[b];
+  if(!elA || !elB || elA === elB) return;
+
+  const firstA = elA.getBoundingClientRect();
+  const firstB = elB.getBoundingClientRect();
+
+  const marker = document.createComment('swap-marker');
+  board.insertBefore(marker, elA);
+  board.insertBefore(elA, elB);
+  board.insertBefore(elB, marker);
+  board.removeChild(marker);
+
+  const lastA = elA.getBoundingClientRect();
+  const lastB = elB.getBoundingClientRect();
+
+  elA.style.transition = 'none';
+  elB.style.transition = 'none';
+  elA.style.transform = `translate(${firstA.left - lastA.left}px, ${firstA.top - lastA.top}px) scale(1.04)`;
+  elB.style.transform = `translate(${firstB.left - lastB.left}px, ${firstB.top - lastB.top}px) scale(1.04)`;
+  elA.style.zIndex = '50';
+  elB.style.zIndex = '51';
+
+  await wait(35);
+
+  elA.style.transition = 'transform 1.05s cubic-bezier(.18,.86,.24,1)';
+  elB.style.transition = 'transform 1.05s cubic-bezier(.18,.86,.24,1)';
+  elA.style.transform = 'translate(0, 0) scale(1)';
+  elB.style.transform = 'translate(0, 0) scale(1)';
+
+  await wait(1080);
+
+  elA.style.transition = '';
+  elB.style.transition = '';
+  elA.style.transform = '';
+  elB.style.transform = '';
+  elA.style.zIndex = '';
+  elB.style.zIndex = '';
+}
 
 async function animateShuffle(){
   const board = document.getElementById('board');
-  const wraps = [...board.querySelectorAll('.card-wrap')];
   board.classList.add('shuffling');
 
-  wraps.forEach((wrap,i)=>{
-    const x = (1.5 - (i % 4)) * 92;
-    const y = (1.5 - Math.floor(i / 4)) * 68;
-    const r = (i % 2 === 0 ? 1 : -1) * (160 + i*9);
-    wrap.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg) scale(.88)`;
-    wrap.style.zIndex = String(30 + i);
-  });
-  await wait(820);
+  // Barajado visible: son pocos intercambios, lentos y reales.
+  // El jugador puede seguir algunas cartas con la vista, no como casino turbio de caricatura.
+  const visibleSwaps = [
+    [0, 5], [3, 10], [12, 7], [15, 2],
+    [1, 8], [6, 14], [4, 11], [9, 13],
+    [5, 10], [2, 7], [0, 12], [3, 15]
+  ];
 
-  for(let step=0; step<3; step++){
-    wraps.forEach((wrap)=>{
-      const x = Math.round(Math.random()*240 - 120);
-      const y = Math.round(Math.random()*180 - 90);
-      const r = Math.round(Math.random()*720 - 360);
-      wrap.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg) scale(${.9 + Math.random()*0.18})`;
-      wrap.style.zIndex = String(30 + Math.floor(Math.random()*20));
-    });
-    await wait(520);
+  for(const [a, b] of visibleSwaps){
+    await animateVisibleSwap(a, b);
+    const tmp = gameState.cards[a];
+    gameState.cards[a] = gameState.cards[b];
+    gameState.cards[b] = tmp;
+    await wait(160);
   }
 
-  wraps.forEach(wrap=>{ wrap.style.transform=''; wrap.style.zIndex=''; });
-  await wait(650);
+  gameState.cards = gameState.cards.map((card, i) => ({
+    ...card,
+    id: i,
+    flipped: false,
+    matched: false
+  }));
+
   board.classList.remove('shuffling');
 }
 
 export async function newGame(){
+  if(gameState.starting || gameState.blocked || gameState.playing){
+    showMsg('Ya hay una partida preparándose o en curso. Termina esa antes de iniciar otra.', 'warning');
+    return;
+  }
+  gameState.starting = true;
+  setNewGameButtonBusy(true);
+
   if(!session.currentUser){
+    gameState.starting = false;
+    setNewGameButtonBusy(false);
     document.getElementById('auth-modal').style.display = 'flex';
     return;
   }
   if(gameState.saldo < C){
+    gameState.starting = false;
+    setNewGameButtonBusy(false);
     showMsg('No tienes saldo suficiente. Reinicia el juego.', 'danger');
     return;
   }
 
+  const token = ++gameState.gameToken;
   const deck = shuffle([...EMOJIS, ...EMOJIS]);
   gameState.playing = false;
   gameState.cards = deck.map((emoji,i)=>({ id:i, emoji, flipped:true, matched:false }));
@@ -54,29 +109,36 @@ export async function newGame(){
   gameState.blocked = true;
   gameState.saldo -= C;
   await updateSaldo(session.currentUser.uid, gameState.saldo);
+  if(token !== gameState.gameToken) return;
 
   renderBoard(flipCard);
   updateStats();
-  showMsg('Memoriza las cartas. Después se darán vuelta y se mezclarán.', 'info');
+  showMsg('Memoriza las cartas. Tendrás unos segundos antes del mezclado visible.', 'info');
 
-  await wait(2800);
+  await wait(5000);
+  if(token !== gameState.gameToken) return;
   showMsg('Cartas ocultándose...', 'warning');
   gameState.cards.forEach(c => c.flipped = false);
   updateCardClasses();
 
   await wait(900);
-  showMsg('Mezclando cartas...', 'warning');
+  if(token !== gameState.gameToken) return;
+  showMsg('Mezclando cartas... sigue el movimiento con la vista.', 'warning');
   await animateShuffle();
+  if(token !== gameState.gameToken) return;
 
-  gameState.cards = shuffle(gameState.cards).map((card,i)=>({ ...card, id:i, flipped:false, matched:false }));
   renderBoard(flipCard);
   await wait(250);
+  if(token !== gameState.gameToken) return;
 
   gameState.playing = true;
   gameState.blocked = false;
+  gameState.starting = false;
+  gameState.startTime = Date.now();
+  setNewGameButtonBusy(true, 'Partida en curso...');
   renderBoard(flipCard);
   updateStats();
-  showMsg('Ahora sí: juega.', 'success');
+  showMsg('Ahora sí: juega. Si seguiste el movimiento, deberías tener opciones reales.', 'success');
 }
 
 export function flipCard(id){
@@ -133,10 +195,33 @@ export function flipCard(id){
 }
 
 export async function endGame(){
+  if(!gameState.playing && gameState.endTime) return;
   gameState.playing = false;
+  gameState.blocked = true;
+  gameState.starting = false;
+  setNewGameButtonBusy(false);
+
+  const completed = gameState.matched === TOTAL_PAIRS;
+  gameState.endTime = Date.now();
+  const tiempoMs = gameState.startTime ? gameState.endTime - gameState.startTime : 0;
+  const premioRanking = 10000;
   const net = gameState.gananciaPartida;
-  const type = net > 0 ? 'success' : net === 0 ? 'info' : 'danger';
-  showMsg(`Partida terminada. ${gameState.matched}/${K_MAX} · Resultado: ${net >= 0 ? '+' : ''}${formatMoney(net)} · Saldo actual: ${formatMoney(gameState.saldo)}`, type);
+  const type = completed ? 'success' : (net > 0 ? 'success' : net === 0 ? 'info' : 'danger');
+
+  if(completed){
+    showMsg(`¡Completaste los 8 pares! Tiempo: ${formatDuration(tiempoMs)} · Intentos: ${gameState.intentos} · Premio ficticio: ${formatMoney(premioRanking)}`, 'success');
+    showVictoryAnimation({ tiempoMs, intentos: gameState.intentos, premio: premioRanking });
+    await addLeaderboardEntry({
+      uid: session.currentUser.uid,
+      user: session.currentUser.nickname,
+      tiempoMs,
+      intentos: gameState.intentos,
+      pares: gameState.matched,
+      premio: premioRanking
+    });
+  }else{
+    showMsg(`Partida terminada. ${gameState.matched}/${TOTAL_PAIRS} · Resultado: ${net >= 0 ? '+' : ''}${formatMoney(net)} · Saldo actual: ${formatMoney(gameState.saldo)}`, type);
+  }
 
   await addLiveHistory({
     user: session.currentUser.nickname,
@@ -153,9 +238,11 @@ export async function endGame(){
   updateStats();
 }
 
+
 export async function resetGame(){
   resetGameState();
   gameState.saldo = INITIAL_SALDO;
+  setNewGameButtonBusy(false);
   clearBoard();
   if(session.currentUser) await resetOnlineStats(session.currentUser.uid);
   updateStats();

@@ -25,7 +25,8 @@ import {
   showMsg,
   renderUser,
   updateStats,
-  clearBoard
+  clearBoard,
+  setNewGameButtonBusy
 } from './ui.js';
 
 function isForbiddenNickname(name){
@@ -83,7 +84,7 @@ export async function handleAuthSubmit(){
       if(nickError){ showAuthError(nickError); return; }
 
       const cleanNick = normalizeNickname(nickname);
-      if(await nicknameTaken(cleanNick)){
+      if(await nicknameTaken(cleanNick, user.uid)){
         showAuthError('Ese nickname ya está ocupado. Elige otro, la creatividad aún no está prohibida.');
         return;
       }
@@ -117,6 +118,7 @@ export async function handleAuthSubmit(){
       return;
     }
 
+    session.registering = true;
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     const uid = cred.user.uid;
     let reserved = false;
@@ -124,13 +126,20 @@ export async function handleAuthSubmit(){
     try{
       await reserveNickname(cleanNick, uid);
       reserved = true;
-      await createUserProfile(uid, { nickname, email });
+      const profile = await createUserProfile(uid, { nickname, email });
+      session.currentUser = { uid, email: cred.user.email, nickname: profile.nickname };
+      gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
+      hideAuthModal();
+      renderUser(profile);
+      updateStats();
+      showMsg(`Cuenta creada como ${escapeHTML(profile.nickname)}. Presiona Nueva partida para comenzar.`, 'success');
     }catch(dbError){
       if(reserved) await releaseNickname(cleanNick).catch(() => {});
       await deleteUser(cred.user).catch(() => {});
       throw new Error('La cuenta se creó, pero falló el perfil. Se limpió automáticamente. Intenta nuevamente.');
     }
   }catch(error){
+    session.registering = false;
     // Caso común durante pruebas: el correo ya existe en Authentication,
     // pero el perfil quedó incompleto en Realtime Database. En vez de dejarte
     // atrapado, intentamos iniciar sesión y luego el listener pedirá nickname.
@@ -144,6 +153,8 @@ export async function handleAuthSubmit(){
       }
     }
     showAuthError(error.code ? mapAuthError(error) : error.message);
+  }finally{
+    session.registering = false;
   }
 }
 
@@ -164,6 +175,7 @@ export function listenAuthState(){
       setAuthMode('login');
       document.getElementById('player-name').textContent = 'Jugador';
       resetGameState();
+      setNewGameButtonBusy(false);
       clearBoard();
       updateStats();
       return;
@@ -171,6 +183,11 @@ export function listenAuthState(){
 
     try{
       let profile = await getUserProfile(user.uid);
+      if(!profile && session.registering){
+        // Espera breve para evitar que el listener se adelante al guardado del perfil.
+        await new Promise(resolve => setTimeout(resolve, 900));
+        profile = await getUserProfile(user.uid);
+      }
       if(!profile){
         await rebuildMissingProfile(user);
         return;
