@@ -78,11 +78,20 @@ async function animateShuffle(){
 }
 
 export async function newGame(){
-  if(gameState.starting || gameState.blocked || gameState.playing){
-    showMsg('Ya hay una partida preparándose o en curso. Termina esa antes de iniciar otra.', 'warning');
+  // Bloqueamos solo mientras se prepara la partida, para evitar doble clics reales.
+  // Si ya hay una partida en curso, Nueva partida cancela esa ronda y comienza otra limpia.
+  if(gameState.starting){
+    showMsg('Ya se está preparando una partida. Espera un momento.', 'warning');
     return;
   }
+
+  gameState.gameToken++;
+  gameState.playing = false;
+  gameState.blocked = false;
   gameState.starting = true;
+  gameState.flipped = [];
+  gameState.startTime = 0;
+  gameState.endTime = 0;
   setNewGameButtonBusy(true);
 
   if(!session.currentUser){
@@ -98,7 +107,7 @@ export async function newGame(){
     return;
   }
 
-  const token = ++gameState.gameToken;
+  const token = gameState.gameToken;
   const deck = shuffle([...EMOJIS, ...EMOJIS]);
   gameState.playing = false;
   gameState.cards = deck.map((emoji,i)=>({ id:i, emoji, flipped:true, matched:false }));
@@ -109,33 +118,58 @@ export async function newGame(){
   gameState.blocked = true;
   gameState.saldo -= C;
   await updateSaldo(session.currentUser.uid, gameState.saldo);
-  if(token !== gameState.gameToken) return;
+  if(token !== gameState.gameToken){
+    gameState.starting = false;
+    gameState.blocked = false;
+    setNewGameButtonBusy(false);
+    return;
+  }
 
   renderBoard(flipCard);
   updateStats();
   showMsg('Memoriza las cartas. Tendrás unos segundos antes del mezclado visible.', 'info');
 
   await wait(5000);
-  if(token !== gameState.gameToken) return;
+  if(token !== gameState.gameToken){
+    gameState.starting = false;
+    gameState.blocked = false;
+    setNewGameButtonBusy(false);
+    return;
+  }
   showMsg('Cartas ocultándose...', 'warning');
   gameState.cards.forEach(c => c.flipped = false);
   updateCardClasses();
 
   await wait(900);
-  if(token !== gameState.gameToken) return;
+  if(token !== gameState.gameToken){
+    gameState.starting = false;
+    gameState.blocked = false;
+    setNewGameButtonBusy(false);
+    return;
+  }
   showMsg('Mezclando cartas... sigue el movimiento con la vista.', 'warning');
   await animateShuffle();
-  if(token !== gameState.gameToken) return;
+  if(token !== gameState.gameToken){
+    gameState.starting = false;
+    gameState.blocked = false;
+    setNewGameButtonBusy(false);
+    return;
+  }
 
   renderBoard(flipCard);
   await wait(250);
-  if(token !== gameState.gameToken) return;
+  if(token !== gameState.gameToken){
+    gameState.starting = false;
+    gameState.blocked = false;
+    setNewGameButtonBusy(false);
+    return;
+  }
 
   gameState.playing = true;
   gameState.blocked = false;
   gameState.starting = false;
   gameState.startTime = Date.now();
-  setNewGameButtonBusy(true, 'Partida en curso...');
+  setNewGameButtonBusy(false);
   renderBoard(flipCard);
   updateStats();
   showMsg('Ahora sí: juega. Si seguiste el movimiento, deberías tener opciones reales.', 'success');
@@ -143,6 +177,7 @@ export async function newGame(){
 
 export function flipCard(id){
   if(!gameState.playing || gameState.blocked) return;
+  const token = gameState.gameToken;
   const card = gameState.cards[id];
   if(!card || card.flipped || card.matched || gameState.flipped.length >= 2) return;
 
@@ -159,6 +194,7 @@ export function flipCard(id){
     const [a,b] = gameState.flipped.map(i => gameState.cards[i]);
     if(a.emoji === b.emoji){
       setTimeout(async ()=>{
+        if(token !== gameState.gameToken) return;
         a.matched = b.matched = true;
         a.flipped = b.flipped = false;
         gameState.matched++;
@@ -181,6 +217,7 @@ export function flipCard(id){
       wB && wB.classList.add('wrong');
 
       setTimeout(()=>{
+        if(token !== gameState.gameToken) return;
         a.flipped = b.flipped = false;
         gameState.flipped = [];
         gameState.blocked = false;
