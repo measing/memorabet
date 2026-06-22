@@ -223,9 +223,15 @@ export function showMsg(text, type='info'){
   m.innerHTML = text;
 }
 
+export function setStartPanelVisible(isVisible){
+  const panel = document.getElementById('start-game-panel');
+  if(panel) panel.classList.toggle('hidden', !isVisible);
+}
+
 export function renderBoard(onCardClick){
   const board = document.getElementById('board');
   if(!board) return;
+  setStartPanelVisible(false);
   board.innerHTML = '';
 
   gameState.cards.forEach(card => {
@@ -400,6 +406,7 @@ export function renderLiveHistoryList(history = session.cachedLiveHistory){
 export function clearBoard(){
   const board = document.getElementById('board');
   if(board) board.innerHTML = '';
+  setStartPanelVisible(true);
 }
 
 export function showView(viewName){

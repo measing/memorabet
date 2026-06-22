@@ -17,6 +17,7 @@ function bindEvents(){
   });
   document.getElementById('btn-change-user')?.addEventListener('click', logoutUser);
   document.getElementById('btn-new')?.addEventListener('click', newGame);
+  document.getElementById('btn-start-center')?.addEventListener('click', newGame);
   document.getElementById('btn-reset')?.addEventListener('click', resetGame);
 }
 
