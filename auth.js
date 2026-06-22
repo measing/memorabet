@@ -26,7 +26,10 @@ import {
   renderUser,
   updateStats,
   clearBoard,
-  setNewGameButtonBusy
+  setNewGameButtonBusy,
+  showRulesModalIfNeeded,
+  resetAvatarDisplay,
+  resetCardSkinDisplay
 } from './ui.js';
 
 function isForbiddenNickname(name){
@@ -92,12 +95,13 @@ export async function handleAuthSubmit(){
       await reserveNickname(cleanNick, user.uid);
       const profile = await createUserProfile(user.uid, { nickname, email: user.email || '' });
       session.pendingProfileUser = null;
-      session.currentUser = { uid: user.uid, email: user.email, nickname: profile.nickname };
+      session.currentUser = { uid: user.uid, email: user.email, nickname: profile.nickname, avatar: profile.avatar || '', ownedCardSkins: profile.ownedCardSkins || [], selectedCardSkin: profile.selectedCardSkin || 'default' };
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
       updateStats();
       showMsg(`Perfil creado como ${escapeHTML(profile.nickname)}. Presiona Nueva partida para comenzar.`, 'success');
+      showRulesModalIfNeeded();
       return;
     }
 
@@ -127,12 +131,13 @@ export async function handleAuthSubmit(){
       await reserveNickname(cleanNick, uid);
       reserved = true;
       const profile = await createUserProfile(uid, { nickname, email });
-      session.currentUser = { uid, email: cred.user.email, nickname: profile.nickname };
+      session.currentUser = { uid, email: cred.user.email, nickname: profile.nickname, avatar: profile.avatar || '', ownedCardSkins: profile.ownedCardSkins || [], selectedCardSkin: profile.selectedCardSkin || 'default' };
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
       updateStats();
       showMsg(`Cuenta creada como ${escapeHTML(profile.nickname)}. Presiona Nueva partida para comenzar.`, 'success');
+      showRulesModalIfNeeded();
     }catch(dbError){
       if(reserved) await releaseNickname(cleanNick).catch(() => {});
       await deleteUser(cred.user).catch(() => {});
@@ -178,6 +183,10 @@ export function listenAuthState(){
       setNewGameButtonBusy(false);
       clearBoard();
       updateStats();
+      resetAvatarDisplay();
+      resetCardSkinDisplay();
+      const profileName = document.getElementById('profile-name');
+      if(profileName) profileName.textContent = 'Jugador';
       return;
     }
 
@@ -194,12 +203,13 @@ export function listenAuthState(){
       }
 
       session.pendingProfileUser = null;
-      session.currentUser = { uid: user.uid, email: user.email, nickname: profile.nickname };
+      session.currentUser = { uid: user.uid, email: user.email, nickname: profile.nickname, avatar: profile.avatar || '', ownedCardSkins: profile.ownedCardSkins || [], selectedCardSkin: profile.selectedCardSkin || 'default' };
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
       updateStats();
       showMsg(`Bienvenido, ${escapeHTML(profile.nickname)}. Presiona Nueva partida para comenzar.`, 'info');
+      showRulesModalIfNeeded();
     }catch(error){
       showAuthError(`No se pudo cargar el perfil: ${error.message}`);
       showAuthModal();

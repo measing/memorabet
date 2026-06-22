@@ -2,7 +2,8 @@ import { listenAuthState, handleAuthSubmit, setAuthMode, logoutUser } from './au
 import { newGame, resetGame } from './game.js';
 import { listenLiveHistory, listenLeaderboard } from './database.js';
 import { session } from './state.js';
-import { renderLiveHistoryList, updateStats, renderLeaderboard } from './ui.js';
+import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js';
+import { initAudioControls } from './audio.js';
 
 function bindEvents(){
   document.getElementById('tab-login')?.addEventListener('click', () => setAuthMode('login'));
@@ -20,6 +21,11 @@ function bindEvents(){
 }
 
 bindEvents();
+initRulesModal();
+initViewNavigation();
+initProfileAvatars();
+initCardSkinStore();
+initAudioControls();
 setAuthMode('login');
 updateStats();
 listenAuthState();
@@ -34,4 +40,7 @@ listenLeaderboard(ranking => {
   renderLeaderboard(ranking);
 });
 
-setInterval(() => renderLiveHistoryList(), 5000);
+setInterval(() => {
+  updateStats();
+  renderLiveHistoryList();
+}, 1000);

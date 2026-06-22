@@ -1,8 +1,9 @@
-import { EMOJIS, K_MAX, TOTAL_PAIRS, G, C, INITIAL_SALDO } from './constants.js';
+import { ANIMAL_CARDS, K_MAX, TOTAL_PAIRS, G, C, INITIAL_SALDO } from './constants.js';
 import { gameState, session, resetGameState } from './state.js';
 import { shuffle, wait, formatMoney } from './utils.js';
 import { updateSaldo, resetOnlineStats, addLiveHistory, updateUserStats, addLeaderboardEntry } from './database.js';
-import { renderBoard, updateCardClasses, updateStats, showMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, formatDuration } from './ui.js';
+import { renderBoard, updateCardClasses, updateStats, showMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js';
+import { playCardFlip, playShuffle, playMatch, playMiss } from './audio.js';
 
 async function animateVisibleSwap(a, b){
   const board = document.getElementById('board');
@@ -10,6 +11,7 @@ async function animateVisibleSwap(a, b){
   const elA = cards[a];
   const elB = cards[b];
   if(!elA || !elB || elA === elB) return;
+  playShuffle();
 
   const firstA = elA.getBoundingClientRect();
   const firstB = elB.getBoundingClientRect();
@@ -32,12 +34,12 @@ async function animateVisibleSwap(a, b){
 
   await wait(35);
 
-  elA.style.transition = 'transform 1.05s cubic-bezier(.18,.86,.24,1)';
-  elB.style.transition = 'transform 1.05s cubic-bezier(.18,.86,.24,1)';
+  elA.style.transition = 'transform .72s cubic-bezier(.18,.86,.24,1)';
+  elB.style.transition = 'transform .72s cubic-bezier(.18,.86,.24,1)';
   elA.style.transform = 'translate(0, 0) scale(1)';
   elB.style.transform = 'translate(0, 0) scale(1)';
 
-  await wait(1080);
+  await wait(760);
 
   elA.style.transition = '';
   elB.style.transition = '';
@@ -64,7 +66,7 @@ async function animateShuffle(){
     const tmp = gameState.cards[a];
     gameState.cards[a] = gameState.cards[b];
     gameState.cards[b] = tmp;
-    await wait(160);
+    await wait(80);
   }
 
   gameState.cards = gameState.cards.map((card, i) => ({
@@ -108,9 +110,16 @@ export async function newGame(){
   }
 
   const token = gameState.gameToken;
-  const deck = shuffle([...EMOJIS, ...EMOJIS]);
+  const deck = shuffle([...ANIMAL_CARDS, ...ANIMAL_CARDS]);
   gameState.playing = false;
-  gameState.cards = deck.map((emoji,i)=>({ id:i, emoji, flipped:true, matched:false }));
+  gameState.cards = deck.map((animal,i)=>({
+    id:i,
+    animalId:animal.id,
+    name:animal.name,
+    src:animal.src,
+    flipped:true,
+    matched:false
+  }));
   gameState.flipped = [];
   gameState.matched = 0;
   gameState.intentos = 0;
@@ -140,7 +149,7 @@ export async function newGame(){
   gameState.cards.forEach(c => c.flipped = false);
   updateCardClasses();
 
-  await wait(900);
+  await wait(650);
   if(token !== gameState.gameToken){
     gameState.starting = false;
     gameState.blocked = false;
@@ -181,6 +190,7 @@ export function flipCard(id){
   const card = gameState.cards[id];
   if(!card || card.flipped || card.matched || gameState.flipped.length >= 2) return;
 
+  playCardFlip();
   card.flipped = true;
   gameState.flipped.push(id);
   const el = document.querySelector(`.card-wrap[data-id="${id}"]`);
@@ -192,7 +202,8 @@ export function flipCard(id){
     updateStats();
 
     const [a,b] = gameState.flipped.map(i => gameState.cards[i]);
-    if(a.emoji === b.emoji){
+    if(a.animalId === b.animalId){
+      playMatch();
       setTimeout(async ()=>{
         if(token !== gameState.gameToken) return;
         a.matched = b.matched = true;
@@ -211,6 +222,7 @@ export function flipCard(id){
         else showMsg(`Par encontrado. +${formatMoney(G)}.`, 'success');
       }, 520);
     }else{
+      playMiss();
       const wA = document.querySelector(`.card-wrap[data-id="${gameState.flipped[0]}"]`);
       const wB = document.querySelector(`.card-wrap[data-id="${gameState.flipped[1]}"]`);
       wA && wA.classList.add('wrong');
@@ -244,6 +256,7 @@ export async function endGame(){
   const premioRanking = 10000;
   const net = gameState.gananciaPartida;
   const type = completed ? 'success' : (net > 0 ? 'success' : net === 0 ? 'info' : 'danger');
+  const avatar = getSelectedAvatar();
 
   if(completed){
     showMsg(`¡Completaste los 8 pares! Tiempo: ${formatDuration(tiempoMs)} · Intentos: ${gameState.intentos} · Premio ficticio: ${formatMoney(premioRanking)}`, 'success');
@@ -254,7 +267,8 @@ export async function endGame(){
       tiempoMs,
       intentos: gameState.intentos,
       pares: gameState.matched,
-      premio: premioRanking
+      premio: premioRanking,
+      avatar
     });
   }else{
     showMsg(`Partida terminada. ${gameState.matched}/${TOTAL_PAIRS} · Resultado: ${net >= 0 ? '+' : ''}${formatMoney(net)} · Saldo actual: ${formatMoney(gameState.saldo)}`, type);
@@ -264,7 +278,8 @@ export async function endGame(){
     user: session.currentUser.nickname,
     pares: gameState.matched,
     intentos: gameState.intentos,
-    net
+    net,
+    avatar
   });
   const updated = await updateUserStats(session.currentUser.uid, {
     pares: gameState.matched,

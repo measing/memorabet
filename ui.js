@@ -1,6 +1,174 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js';
 import { gameState, session } from './state.js';
 import { escapeHTML, formatMoney } from './utils.js';
+import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js';
+
+const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
+const AVATARS = Array.from({ length: 36 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
+const DEFAULT_AVATAR = AVATARS[0];
+const CARD_SKIN_OWNED_KEY = 'memorabetOwnedCardSkins';
+const CARD_SKIN_SELECTED_KEY = 'memorabetSelectedCardSkin';
+const DEFAULT_CARD_SKIN_ID = 'default';
+const CARD_SKINS = [
+  { id:DEFAULT_CARD_SKIN_ID, name:'Predeterminado', price:0, src:'', default:true },
+  { id:'red', name:'Carta Roja', price:15000, src:'assets/card-backs/skin-red.png' },
+  { id:'green', name:'Carta Verde', price:15000, src:'assets/card-backs/skin-green.png' },
+  { id:'blue', name:'Carta Azul', price:15000, src:'assets/card-backs/skin-blue.png' },
+  { id:'gold', name:'Carta Dorada', price:20000, src:'assets/card-backs/skin-gold.png' }
+];
+
+export function getSelectedAvatar(){
+  if(AVATARS.includes(session.currentUser?.avatar)) return session.currentUser.avatar;
+  const saved = localStorage.getItem(getAvatarStorageKey());
+  return AVATARS.includes(saved) ? saved : DEFAULT_AVATAR;
+}
+
+function applySelectedAvatar(src = getSelectedAvatar()){
+  document.querySelectorAll('[data-avatar-display]').forEach(el => {
+    el.style.backgroundImage = `url("${src}")`;
+  });
+
+  document.querySelectorAll('.avatar-option').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.avatar === src);
+  });
+}
+
+function getAvatarStorageKey(){
+  return session.currentUser?.uid ? `${AVATAR_STORAGE_KEY}:${session.currentUser.uid}` : `${AVATAR_STORAGE_KEY}:guest`;
+}
+
+function getOwnedCardSkins(){
+  const profileOwned = session.currentUser?.ownedCardSkins;
+  if(Array.isArray(profileOwned)) return [...new Set(profileOwned.filter(id => CARD_SKINS.some(skin => skin.id === id && !skin.default)))];
+
+  try{
+    const owned = JSON.parse(localStorage.getItem(getCardSkinStorageKey(CARD_SKIN_OWNED_KEY)) || '[]');
+    return Array.isArray(owned) ? owned.filter(id => CARD_SKINS.some(skin => skin.id === id && !skin.default)) : [];
+  }catch{
+    return [];
+  }
+}
+
+function setOwnedCardSkins(owned){
+  const clean = [...new Set(owned.filter(id => CARD_SKINS.some(skin => skin.id === id && !skin.default)))];
+  if(session.currentUser) session.currentUser.ownedCardSkins = clean;
+  localStorage.setItem(getCardSkinStorageKey(CARD_SKIN_OWNED_KEY), JSON.stringify(clean));
+}
+
+function getSelectedCardSkin(){
+  const owned = getOwnedCardSkins();
+  const selected = session.currentUser?.selectedCardSkin || localStorage.getItem(getCardSkinStorageKey(CARD_SKIN_SELECTED_KEY)) || DEFAULT_CARD_SKIN_ID;
+  const skin = CARD_SKINS.find(item => item.id === selected);
+  if(!skin) return CARD_SKINS[0];
+  if(skin.default || owned.includes(skin.id)) return skin;
+  return CARD_SKINS[0];
+}
+
+function getCardSkinStorageKey(base){
+  return session.currentUser?.uid ? `${base}:${session.currentUser.uid}` : `${base}:guest`;
+}
+
+async function saveCardSkinState(owned, selectedId){
+  const cleanOwned = [...new Set(owned.filter(id => CARD_SKINS.some(skin => skin.id === id && !skin.default)))];
+  const cleanSelected = CARD_SKINS.some(skin => skin.id === selectedId) ? selectedId : DEFAULT_CARD_SKIN_ID;
+
+  setOwnedCardSkins(cleanOwned);
+  if(session.currentUser) session.currentUser.selectedCardSkin = cleanSelected;
+  localStorage.setItem(getCardSkinStorageKey(CARD_SKIN_SELECTED_KEY), cleanSelected);
+
+  if(session.currentUser){
+    await updateUserCardSkins(session.currentUser.uid, cleanOwned, cleanSelected);
+  }
+}
+
+function showStoreStatus(text, type='info'){
+  const status = document.getElementById('store-status');
+  if(!status) return;
+  status.textContent = text;
+  status.className = `store-status visible ${type}`;
+}
+
+function applySelectedCardSkin(){
+  const selected = getSelectedCardSkin();
+  if(selected && !selected.default) document.documentElement.style.setProperty('--card-back-skin', `url("${selected.src}")`);
+  else document.documentElement.style.removeProperty('--card-back-skin');
+
+  document.querySelectorAll('.skin-card').forEach(card => {
+    card.classList.toggle('equipped', card.dataset.skinId === selected?.id);
+  });
+}
+
+function renderCardSkinStore(){
+  const store = document.getElementById('card-skin-store');
+  if(!store) return;
+
+  const owned = getOwnedCardSkins();
+  const selected = getSelectedCardSkin();
+
+  store.innerHTML = CARD_SKINS.map(skin => {
+    const isOwned = skin.default || owned.includes(skin.id);
+    const isEquipped = selected?.id === skin.id;
+    const action = isEquipped ? 'En uso' : isOwned ? (skin.default ? 'Usar' : 'Equipar') : 'Comprar';
+    const price = skin.default ? 'Gratis' : formatMoney(skin.price);
+    return `
+      <article class="shop-item skin-card ${isEquipped ? 'equipped' : ''}" data-skin-id="${skin.id}">
+        <div class="skin-preview">
+          <div class="skin-art ${skin.default ? 'default-skin-preview' : ''}" ${skin.default ? '' : `style="background-image:url('${skin.src}')"`}>
+            ${skin.default ? '<span>✧</span>' : ''}
+          </div>
+        </div>
+        <div class="skin-info">
+          <strong>${escapeHTML(skin.name)}</strong>
+          <span>${price}</span>
+        </div>
+        <button class="skin-action" type="button" data-skin-action="${skin.id}" ${isEquipped ? 'disabled' : ''}>${action}</button>
+      </article>
+    `;
+  }).join('');
+
+  store.querySelectorAll('[data-skin-action]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const skin = CARD_SKINS.find(item => item.id === btn.dataset.skinAction);
+      if(!skin) return;
+      const currentOwned = getOwnedCardSkins();
+
+      if(skin.default || currentOwned.includes(skin.id)){
+        await saveCardSkinState(currentOwned, skin.id);
+        applySelectedCardSkin();
+        renderCardSkinStore();
+        showStoreStatus(`${skin.name} equipado.`, 'success');
+        return;
+      }
+
+      if(!session.currentUser){
+        showStoreStatus('Inicia sesión para comprar cartas.', 'warning');
+        return;
+      }
+
+      if(gameState.saldo < skin.price){
+        showStoreStatus(`Saldo insuficiente. Necesitas ${formatMoney(skin.price)}.`, 'danger');
+        return;
+      }
+
+      gameState.saldo -= skin.price;
+      await updateSaldo(session.currentUser.uid, gameState.saldo);
+      currentOwned.push(skin.id);
+      await saveCardSkinState(currentOwned, skin.id);
+      updateStats();
+      applySelectedCardSkin();
+      renderCardSkinStore();
+      showStoreStatus(`${skin.name} comprada y equipada.`, 'success');
+    });
+  });
+}
+
+function renderEntryAvatar(avatar, label){
+  const value = String(avatar || '');
+  if(value.startsWith('assets/avatars/')){
+    return `<img src="${escapeHTML(value)}" alt="${escapeHTML(label)}" />`;
+  }
+  return `<span>${escapeHTML(value || '●')}</span>`;
+}
 
 export function setAuthModeUI(mode){
   const isLogin = mode === 'login';
@@ -64,7 +232,13 @@ export function renderBoard(onCardClick){
     const wrap = document.createElement('div');
     wrap.className = 'card-wrap' + ((card.flipped || card.matched) ? ' flipped':'') + (card.matched ? ' matched':'');
     wrap.dataset.id = card.id;
-    wrap.innerHTML = `<div class="card-inner"><div class="card-face card-back"></div><div class="card-face card-front">${card.emoji}</div></div>`;
+    wrap.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-back"></div>
+        <div class="card-face card-front">
+          <img class="animal-card-img" src="${escapeHTML(card.src)}" alt="${escapeHTML(card.name)}" />
+        </div>
+      </div>`;
     if(!card.matched && gameState.playing && !gameState.blocked){
       wrap.addEventListener('click', () => onCardClick(card.id));
     }
@@ -86,18 +260,40 @@ export function updateStats(){
   const pares = document.getElementById('pares');
   const intentos = document.getElementById('intentos');
   const ganancia = document.getElementById('ganancia');
+  const profileBalance = document.getElementById('profile-balance');
+  const tiempo = document.getElementById('tiempo');
 
   if(pares) pares.textContent = `${gameState.matched} / ${TOTAL_PAIRS}`;
   if(intentos) intentos.textContent = gameState.playing ? remaining : K_MAX;
+  if(tiempo){
+    const end = gameState.endTime || Date.now();
+    const elapsed = gameState.startTime ? end - gameState.startTime : 0;
+    tiempo.textContent = formatDuration(elapsed);
+  }
   if(ganancia){
     ganancia.textContent = formatMoney(gameState.saldo);
     ganancia.className = gameState.saldo >= C ? 'success' : 'danger';
   }
+  if(profileBalance) profileBalance.textContent = formatMoney(gameState.saldo);
 }
 
 export function renderUser(profile){
   if(!profile) return;
   document.getElementById('player-name').textContent = profile.nickname || 'Jugador';
+  const profileName = document.getElementById('profile-name');
+  if(profileName) profileName.textContent = profile.nickname || 'Jugador';
+  const profileAvatar = AVATARS.includes(profile.avatar) ? profile.avatar : getSelectedAvatar();
+  if(session.currentUser) session.currentUser.avatar = profileAvatar;
+  localStorage.setItem(getAvatarStorageKey(), profileAvatar);
+  applySelectedAvatar(profileAvatar);
+  if(session.currentUser){
+    session.currentUser.ownedCardSkins = Array.isArray(profile.ownedCardSkins) ? profile.ownedCardSkins : [];
+    session.currentUser.selectedCardSkin = profile.selectedCardSkin || DEFAULT_CARD_SKIN_ID;
+    localStorage.setItem(getCardSkinStorageKey(CARD_SKIN_OWNED_KEY), JSON.stringify(session.currentUser.ownedCardSkins));
+    localStorage.setItem(getCardSkinStorageKey(CARD_SKIN_SELECTED_KEY), session.currentUser.selectedCardSkin);
+  }
+  applySelectedCardSkin();
+  renderCardSkinStore();
   renderUserStats(profile);
 }
 
@@ -107,11 +303,15 @@ export function renderUserStats(stats = {}){
   const best = Number(stats.best || 0);
   const profit = Number(stats.profit || 0);
 
-  document.getElementById('best-game').textContent = `${best}/${TOTAL_PAIRS}`;
-  document.getElementById('hist-games').textContent = games;
-  document.getElementById('hist-avg').textContent = games ? (totalPairs/games).toFixed(2) : '0.00';
-  document.getElementById('hist-best').textContent = `${best}/${TOTAL_PAIRS}`;
-  document.getElementById('hist-profit').textContent = formatMoney(profit);
+  const histGames = document.getElementById('hist-games');
+  const histAvg = document.getElementById('hist-avg');
+  const histBest = document.getElementById('hist-best');
+  const histProfit = document.getElementById('hist-profit');
+
+  if(histGames) histGames.textContent = games;
+  if(histAvg) histAvg.textContent = games ? (totalPairs/games).toFixed(2) : '0.00';
+  if(histBest) histBest.textContent = `${best}/${TOTAL_PAIRS}`;
+  if(histProfit) histProfit.textContent = formatMoney(profit);
 }
 
 
@@ -167,9 +367,9 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
     const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
     const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
     return `<div class="ranking-item">
-      <div class="ranking-pos">${medal}</div>
+      <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, item.user || 'Jugador')}</div>
       <div>
-        <div class="ranking-name ${isCurrent ? 'current':''}">${escapeHTML(item.user || 'Jugador')}</div>
+        <div class="ranking-name ${isCurrent ? 'current':''}">${medal} ${escapeHTML(item.user || 'Jugador')}</div>
         <div class="ranking-meta">${formatDuration(Number(item.tiempoMs || 0))} · ${Number(item.intentos || 0)} intentos</div>
       </div>
       <div class="ranking-prize">${formatMoney(Number(item.premio || 10000))}</div>
@@ -190,9 +390,9 @@ export function renderLiveHistoryList(history = session.cachedLiveHistory){
     const secs = Math.max(0, Math.floor((Date.now() - (item.t || Date.now()))/1000));
     const when = secs < 8 ? 'Ahora mismo' : `Hace ${secs} seg`;
     return `<div class="live-item">
-      <div class="live-avatar">${item.avatar || '🟡'}</div>
+      <div class="entry-avatar live-avatar">${renderEntryAvatar(item.avatar, item.user || 'Jugador')}</div>
       <div><div class="live-name ${isCurrent ? 'current':''}">${escapeHTML(item.user)}</div><div class="live-time">${when}</div></div>
-      <div class="live-score">${item.pares}/${K_MAX}</div>
+      <div class="live-score">${item.pares}/${TOTAL_PAIRS}</div>
     </div>`;
   }).join('');
 }
@@ -200,4 +400,88 @@ export function renderLiveHistoryList(history = session.cachedLiveHistory){
 export function clearBoard(){
   const board = document.getElementById('board');
   if(board) board.innerHTML = '';
+}
+
+export function showView(viewName){
+  const target = viewName || 'game';
+  document.querySelectorAll('.screen-view').forEach(view => {
+    view.classList.toggle('active', view.dataset.view === target);
+  });
+
+  document.querySelectorAll('[data-view-target]').forEach(btn => {
+    const isActive = btn.dataset.viewTarget === target;
+    btn.classList.toggle('active', isActive);
+    if(isActive) btn.setAttribute('aria-current', 'page');
+    else btn.removeAttribute('aria-current');
+  });
+
+  if(target === 'store') renderCardSkinStore();
+}
+
+export function initViewNavigation(){
+  document.querySelectorAll('[data-view-target]').forEach(btn => {
+    btn.addEventListener('click', () => showView(btn.dataset.viewTarget));
+  });
+}
+
+export function initProfileAvatars(){
+  const picker = document.getElementById('avatar-picker');
+  if(picker){
+    picker.innerHTML = AVATARS.map((src, idx) => `
+      <button class="avatar-option" type="button" data-avatar="${src}" aria-label="Avatar ${idx + 1}">
+        <img src="${src}" alt="" />
+      </button>
+    `).join('');
+
+    picker.querySelectorAll('.avatar-option').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const avatar = btn.dataset.avatar;
+        localStorage.setItem(getAvatarStorageKey(), avatar);
+        if(session.currentUser){
+          session.currentUser.avatar = avatar;
+          await updateUserAvatar(session.currentUser.uid, avatar).catch(() => {
+            showMsg('No se pudo guardar el avatar en línea, pero quedó aplicado en este navegador.', 'warning');
+          });
+        }
+        applySelectedAvatar(avatar);
+      });
+    });
+  }
+
+  applySelectedAvatar();
+}
+
+export function resetAvatarDisplay(){
+  applySelectedAvatar(DEFAULT_AVATAR);
+}
+
+export function resetCardSkinDisplay(){
+  document.documentElement.style.removeProperty('--card-back-skin');
+  renderCardSkinStore();
+}
+
+export function initCardSkinStore(){
+  renderCardSkinStore();
+  applySelectedCardSkin();
+}
+
+
+export function initRulesModal(){
+  const btn = document.getElementById('rules-accept');
+  const modal = document.getElementById('rules-modal');
+  if(!btn || !modal) return;
+  btn.addEventListener('click', () => {
+    localStorage.setItem('memorabetRulesAccepted', 'true');
+    modal.classList.remove('visible');
+    modal.setAttribute('aria-hidden', 'true');
+  });
+}
+
+export function showRulesModalIfNeeded(){
+  const modal = document.getElementById('rules-modal');
+  if(!modal) return;
+  const accepted = localStorage.getItem('memorabetRulesAccepted') === 'true';
+  if(accepted) return;
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
 }

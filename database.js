@@ -38,6 +38,9 @@ export async function createUserProfile(uid, { nickname, email }){
     nickname,
     cleanNickname: normalizeNickname(nickname),
     email,
+    avatar: 'assets/avatars/avatar-01.png',
+    ownedCardSkins: [],
+    selectedCardSkin: 'default',
     saldo: INITIAL_SALDO,
     games: 0,
     totalPairs: 0,
@@ -52,6 +55,14 @@ export async function createUserProfile(uid, { nickname, email }){
 
 export async function updateSaldo(uid, saldo){
   await update(ref(db, `users/${uid}`), { saldo, updatedAt: Date.now() });
+}
+
+export async function updateUserAvatar(uid, avatar){
+  await update(ref(db, `users/${uid}`), { avatar, updatedAt: Date.now() });
+}
+
+export async function updateUserCardSkins(uid, ownedCardSkins, selectedCardSkin){
+  await update(ref(db, `users/${uid}`), { ownedCardSkins, selectedCardSkin, updatedAt: Date.now() });
 }
 
 export async function resetOnlineStats(uid){
@@ -73,19 +84,19 @@ export async function updateUserStats(uid, { pares, net, saldo }){
   return { ...profile, ...patch };
 }
 
-export async function addLiveHistory({ user, pares, intentos, net }){
+export async function addLiveHistory({ user, pares, intentos, net, avatar }){
   await push(ref(db, 'liveHistory'), {
     user,
     pares,
     intentos,
     net,
     t: Date.now(),
-    avatar: avatarPool[Math.floor(Math.random() * avatarPool.length)]
+    avatar: avatar || avatarPool[Math.floor(Math.random() * avatarPool.length)]
   });
 }
 
 
-export async function addLeaderboardEntry({ uid, user, tiempoMs, intentos, pares, premio }){
+export async function addLeaderboardEntry({ uid, user, tiempoMs, intentos, pares, premio, avatar }){
   await push(ref(db, 'leaderboard'), {
     uid,
     user,
@@ -95,7 +106,7 @@ export async function addLeaderboardEntry({ uid, user, tiempoMs, intentos, pares
     pares,
     premio,
     t: Date.now(),
-    avatar: avatarPool[Math.floor(Math.random() * avatarPool.length)]
+    avatar: avatar || avatarPool[Math.floor(Math.random() * avatarPool.length)]
   });
 }
 
