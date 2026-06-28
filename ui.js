@@ -16,6 +16,7 @@ const CARD_SKINS = [
   { id:'blue', name:'Carta Azul', price:15000, src:'assets/card-backs/skin-blue.png' },
   { id:'gold', name:'Carta Dorada', price:20000, src:'assets/card-backs/skin-gold.png' }
 ];
+let selectedRankingBoard = 'solo';
 
 function isGuestUser(){
   return !!session.currentUser?.isGuest;
@@ -545,20 +546,48 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
     }).join('');
   };
 
+  const views = {
+    solo:{
+      title:'Solo: 8 pares acertados',
+      label:'Solo',
+      body:renderSolo(boards.solo)
+    },
+    silver:{
+      title:'Duelo de Pares',
+      label:'Pares',
+      badge:'Copas plata',
+      body:renderCups(boards.silver, 'silver')
+    },
+    gold:{
+      title:'Duelo de Memoria',
+      label:'Memoria',
+      badge:'Copas doradas',
+      body:renderCups(boards.gold, 'gold')
+    }
+  };
+  if(!views[selectedRankingBoard]) selectedRankingBoard = 'solo';
+  const current = views[selectedRankingBoard];
+
   list.innerHTML = `
-    <section class="ranking-section ranking-section-solo">
-      <h2>Solo: 8 pares acertados</h2>
-      ${renderSolo(boards.solo)}
-    </section>
-    <section class="ranking-section ranking-section-silver">
-      <h2>Duelo de Pares <span>Copas plata</span></h2>
-      ${renderCups(boards.silver, 'silver')}
-    </section>
-    <section class="ranking-section ranking-section-gold">
-      <h2>Duelo de Memoria <span>Copas doradas</span></h2>
-      ${renderCups(boards.gold, 'gold')}
+    <div class="ranking-switcher" role="tablist" aria-label="Ranking de juego">
+      ${Object.entries(views).map(([key, view]) => `
+        <button class="ranking-switch ${key === selectedRankingBoard ? 'active' : ''}" type="button" data-ranking-board="${key}" role="tab" aria-selected="${key === selectedRankingBoard}">
+          ${escapeHTML(view.label)}
+        </button>
+      `).join('')}
+    </div>
+    <section class="ranking-section ranking-section-${selectedRankingBoard}">
+      <h2>${escapeHTML(current.title)}${current.badge ? `<span>${escapeHTML(current.badge)}</span>` : ''}</h2>
+      ${current.body}
     </section>
   `;
+
+  list.querySelectorAll('[data-ranking-board]').forEach(button => {
+    button.addEventListener('click', () => {
+      selectedRankingBoard = button.dataset.rankingBoard || 'solo';
+      renderLeaderboard(ranking);
+    });
+  });
 }
 
 function renderLeaderboardLegacy(ranking = session.cachedLeaderboard){

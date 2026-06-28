@@ -238,6 +238,32 @@ body::before{
 .sound-controls button:hover{background:rgba(255,255,255,.08);color:white}
 .sound-controls button.active{background:rgba(249,199,79,.12);color:var(--gold)}
 .ranking-list,.live-list{max-height:60vh;overflow-y:auto;padding:8px 10px}.empty{color:var(--muted);padding:22px;text-align:center}
+.ranking-switcher{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin:0 0 16px;
+  padding:6px;
+  border:1px solid rgba(249,199,79,.22);
+  border-radius:12px;
+  background:rgba(0,0,0,.38);
+}
+.ranking-switch{
+  min-height:42px;
+  border:1px solid rgba(249,199,79,.24);
+  border-radius:9px;
+  color:#d8d8d8;
+  background:rgba(255,255,255,.05);
+  font-weight:900;
+  cursor:pointer;
+}
+.ranking-switch:hover,
+.ranking-switch.active{
+  color:#120b02;
+  background:linear-gradient(180deg,#ffd96a,#d68a10);
+  border-color:#ffe09b;
+  box-shadow:0 0 16px rgba(249,199,79,.24);
+}
 .ranking-section{
   margin:0 0 18px;
   padding:0 0 12px;
@@ -1273,6 +1299,14 @@ body.online-duel-active #btn-exit{
     grid-template-columns:48px 1fr auto;
     gap:9px;
     padding:12px 4px;
+  }
+  .ranking-switcher{
+    gap:6px;
+    padding:5px;
+  }
+  .ranking-switch{
+    min-height:38px;
+    font-size:12px;
   }
   .entry-avatar{width:42px;height:42px}
   .ranking-name,.live-name{font-size:15px}
