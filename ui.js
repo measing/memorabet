@@ -1,7 +1,7 @@
-import { K_MAX, TOTAL_PAIRS, C } from './constants.js';
-import { gameState, session } from './state.js';
-import { escapeHTML, formatMoney } from './utils.js';
-import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js';
+import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
+import { gameState, session } from './state.js?v=71';
+import { escapeHTML, formatMoney } from './utils.js?v=71';
+import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=72';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
 const AVATARS = Array.from({ length: 36 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
@@ -16,6 +16,10 @@ const CARD_SKINS = [
   { id:'blue', name:'Carta Azul', price:15000, src:'assets/card-backs/skin-blue.png' },
   { id:'gold', name:'Carta Dorada', price:20000, src:'assets/card-backs/skin-gold.png' }
 ];
+
+function isGuestUser(){
+  return !!session.currentUser?.isGuest;
+}
 
 export function getSelectedAvatar(){
   if(AVATARS.includes(session.currentUser?.avatar)) return session.currentUser.avatar;
@@ -76,7 +80,7 @@ async function saveCardSkinState(owned, selectedId){
   if(session.currentUser) session.currentUser.selectedCardSkin = cleanSelected;
   localStorage.setItem(getCardSkinStorageKey(CARD_SKIN_SELECTED_KEY), cleanSelected);
 
-  if(session.currentUser){
+  if(session.currentUser && !isGuestUser()){
     await updateUserCardSkins(session.currentUser.uid, cleanOwned, cleanSelected);
   }
 }
@@ -140,7 +144,7 @@ function renderCardSkinStore(){
         return;
       }
 
-      if(!session.currentUser){
+      if(!session.currentUser || isGuestUser()){
         showStoreStatus('Inicia sesión para comprar cartas.', 'warning');
         return;
       }
@@ -171,6 +175,7 @@ function renderEntryAvatar(avatar, label){
 }
 
 export function setAuthModeUI(mode){
+  const isChoice = mode === 'choice';
   const isLogin = mode === 'login';
   const isRegister = mode === 'register';
   const isRepair = mode === 'repair';
@@ -179,14 +184,22 @@ export function setAuthModeUI(mode){
   document.getElementById('tab-register')?.classList.toggle('active', isRegister);
 
   const tabs = document.querySelector('.auth-tabs');
-  if(tabs) tabs.style.display = isRepair ? 'none' : 'flex';
+  if(tabs){
+    tabs.style.display = isRepair ? 'none' : 'grid';
+    tabs.classList.toggle('choice-mode', isChoice);
+  }
+
+  const loginTab = document.getElementById('tab-login');
+  const registerTab = document.getElementById('tab-register');
+  if(loginTab) loginTab.textContent = isChoice ? 'Iniciar sesion' : 'Ingresar';
+  if(registerTab) registerTab.textContent = 'Crear cuenta';
 
   const email = document.getElementById('auth-email');
   const pass = document.getElementById('auth-password');
   const nick = document.getElementById('auth-nickname');
 
-  if(email) email.style.display = isRepair ? 'none' : 'block';
-  if(pass) pass.style.display = isRepair ? 'none' : 'block';
+  if(email) email.style.display = (isChoice || isRepair) ? 'none' : 'block';
+  if(pass) pass.style.display = (isChoice || isRepair) ? 'none' : 'block';
   if(nick){
     nick.style.display = (isRegister || isRepair) ? 'block' : 'none';
     if(isRepair) nick.placeholder = 'Elige tu nickname definitivo';
@@ -195,9 +208,17 @@ export function setAuthModeUI(mode){
 
   const submit = document.getElementById('auth-submit');
   if(submit){
+    submit.style.display = isChoice ? 'none' : 'block';
     if(isRepair) submit.textContent = 'Guardar nickname';
     else submit.textContent = isRegister ? 'Crear cuenta' : 'Ingresar';
   }
+
+  const guest = document.getElementById('btn-guest');
+  if(guest) guest.style.display = (isChoice || isLogin) ? 'block' : 'none';
+  const google = document.getElementById('auth-google');
+  if(google) google.style.display = 'none';
+  const googleChoice = document.getElementById('auth-google-choice');
+  if(googleChoice) googleChoice.style.display = isChoice ? 'block' : 'none';
   showAuthError('');
 }
 
@@ -223,6 +244,13 @@ export function showMsg(text, type='info'){
   m.innerHTML = text;
 }
 
+export function hideMsg(){
+  const m = document.getElementById('msg');
+  if(!m) return;
+  m.className = 'message';
+  m.textContent = '';
+}
+
 export function setStartPanelVisible(isVisible){
   const panel = document.getElementById('start-game-panel');
   if(panel) panel.classList.toggle('hidden', !isVisible);
@@ -245,7 +273,7 @@ export function renderBoard(onCardClick){
           <img class="animal-card-img" src="${escapeHTML(card.src)}" alt="${escapeHTML(card.name)}" />
         </div>
       </div>`;
-    if(!card.matched && gameState.playing && !gameState.blocked){
+    if(onCardClick){
       wrap.addEventListener('click', () => onCardClick(card.id));
     }
     board.appendChild(wrap);
@@ -263,29 +291,104 @@ export function updateCardClasses(){
 
 export function updateStats(){
   const remaining = Math.max(0, K_MAX - gameState.intentos);
+  const localDuel = !!gameState.localDuel?.active;
+  const onlineDuel = !!gameState.onlineRoom?.id;
+  const onlineStatus = gameState.onlineRoom?.status || '';
+  const onlineSearching = ['searching', 'waiting', 'ready'].includes(onlineStatus);
+  const roundActive = gameState.starting || gameState.playing || gameState.cards.length > 0;
+  const startPanel = document.getElementById('start-game-panel');
+  const onlineWaiting = document.getElementById('online-waiting');
+  const onlineWaitingText = document.getElementById('online-waiting-text');
+  const controlsActive = roundActive && (!!startPanel?.classList.contains('hidden') || onlineDuel);
+  const duel = gameState.localDuel || {};
   const pares = document.getElementById('pares');
+  const roundNumber = document.getElementById('round-number');
   const intentos = document.getElementById('intentos');
   const ganancia = document.getElementById('ganancia');
   const profileBalance = document.getElementById('profile-balance');
   const tiempo = document.getElementById('tiempo');
+  const duelPanel = document.getElementById('local-duel-panel');
+  const duelPlayer1 = document.getElementById('duel-player-1');
+  const duelPlayer2 = document.getElementById('duel-player-2');
+  const duelName1 = document.getElementById('duel-name-1');
+  const duelName2 = document.getElementById('duel-name-2');
+  const duelAvatar1 = document.getElementById('duel-avatar-1');
+  const duelAvatar2 = document.getElementById('duel-avatar-2');
+  const duelScore1 = document.getElementById('duel-score-1');
+  const duelScore2 = document.getElementById('duel-score-2');
+  const duelTurn = document.getElementById('duel-turn');
+  document.body.classList.toggle('game-round-active', roundActive);
+  document.body.classList.toggle('game-controls-active', controlsActive);
+  document.body.classList.toggle('local-duel-active', localDuel);
+  document.body.classList.toggle('online-duel-active', onlineDuel);
+  startPanel?.classList.toggle('online-searching', onlineSearching);
+  if(onlineWaiting) onlineWaiting.hidden = !onlineSearching;
+  if(onlineWaitingText){
+    onlineWaitingText.textContent = onlineStatus === 'ready'
+      ? 'Rival encontrado'
+      : 'Buscando rival online...';
+  }
 
+  if(roundNumber){
+    const visibleRound = localDuel
+      ? (duel.mode === 'memory' ? '1' : (duel.suddenDeath ? 'SD' : String(duel.round || 1)))
+      : String(gameState.round || 1);
+    roundNumber.textContent = visibleRound;
+  }
   if(pares) pares.textContent = `${gameState.matched} / ${TOTAL_PAIRS}`;
-  if(intentos) intentos.textContent = gameState.playing ? remaining : K_MAX;
+  if(intentos) intentos.textContent = localDuel ? gameState.intentos : (gameState.playing ? remaining : K_MAX);
   if(tiempo){
     const end = gameState.endTime || Date.now();
     const elapsed = gameState.startTime ? end - gameState.startTime : 0;
     tiempo.textContent = formatDuration(elapsed);
   }
+  if(duelPanel){
+    duelPanel.hidden = !localDuel;
+    if(localDuel){
+      const [p1, p2] = duel.players;
+      duelPlayer1?.classList.toggle('active', gameState.localDuel.current === 0);
+      duelPlayer2?.classList.toggle('active', gameState.localDuel.current === 1);
+      if(duelName1) duelName1.textContent = p1?.name || 'Jugador 1';
+      if(duelName2) duelName2.textContent = p2?.name || 'Jugador 2';
+      if(duelAvatar1) duelAvatar1.style.backgroundImage = p1?.avatar ? `url("${p1.avatar}")` : '';
+      if(duelAvatar2) duelAvatar2.style.backgroundImage = p2?.avatar ? `url("${p2.avatar}")` : '';
+      if(duelScore1) duelScore1.textContent = p1?.score ?? 0;
+      if(duelScore2) duelScore2.textContent = p2?.score ?? 0;
+      if(duelTurn){
+        const wins = Array.isArray(duel.roundWins) ? duel.roundWins : [0, 0];
+        const activePlayer = duel.players[duel.current] || duel.players[0] || { name:'Jugador 1' };
+        const baseTurn = duel.suddenDeath
+          ? `Muerte subita: turno de ${activePlayer.name}`
+          : `Turno de ${activePlayer.name}`;
+        const turnText = duel.statusText || (roundActive
+          ? (duel.mode === 'memory' ? `${baseTurn} · Primero a 8 pares` : `${baseTurn} · Rondas ${wins[0]}-${wins[1]}`)
+          : '');
+        duelTurn.textContent = turnText;
+        duelTurn.hidden = !turnText;
+      }
+    }
+  }
   if(ganancia){
     ganancia.textContent = formatMoney(gameState.saldo);
     ganancia.className = gameState.saldo >= C ? 'success' : 'danger';
   }
-  if(profileBalance) profileBalance.textContent = formatMoney(gameState.saldo);
+  if(profileBalance) profileBalance.textContent = localDuel ? (onlineDuel ? 'Modo online' : 'Modo offline') : formatMoney(gameState.saldo);
+
+  const newBtn = document.getElementById('btn-new');
+  if(newBtn && !newBtn.disabled){
+    if(localDuel){
+      if(duel.matchOver) newBtn.textContent = '▶ Nueva partida';
+      else if(!gameState.playing && !gameState.starting && gameState.cards.length){
+        newBtn.textContent = duel.mode === 'memory' ? '▶ Nueva partida' : (duel.suddenDeath ? '▶ Muerte subita' : `▶ Ronda ${duel.round || 1}`);
+      }else newBtn.textContent = '▶ Nueva partida';
+    }else newBtn.textContent = '▶ Nueva partida';
+  }
 }
 
 export function renderUser(profile){
   if(!profile) return;
   document.getElementById('player-name').textContent = profile.nickname || 'Jugador';
+  session.trophies = Number(profile.trophies || 0);
   const profileName = document.getElementById('profile-name');
   if(profileName) profileName.textContent = profile.nickname || 'Jugador';
   const profileAvatar = AVATARS.includes(profile.avatar) ? profile.avatar : getSelectedAvatar();
@@ -308,12 +411,17 @@ export function renderUserStats(stats = {}){
   const totalPairs = Number(stats.totalPairs || 0);
   const best = Number(stats.best || 0);
   const profit = Number(stats.profit || 0);
+  const trophies = Number(stats.trophies ?? session.trophies ?? 0);
 
+  const playerTrophies = document.getElementById('player-trophies');
+  const histTrophies = document.getElementById('hist-trophies');
   const histGames = document.getElementById('hist-games');
   const histAvg = document.getElementById('hist-avg');
   const histBest = document.getElementById('hist-best');
   const histProfit = document.getElementById('hist-profit');
 
+  if(playerTrophies) playerTrophies.textContent = trophies;
+  if(histTrophies) histTrophies.textContent = trophies;
   if(histGames) histGames.textContent = games;
   if(histAvg) histAvg.textContent = games ? (totalPairs/games).toFixed(2) : '0.00';
   if(histBest) histBest.textContent = `${best}/${TOTAL_PAIRS}`;
@@ -322,11 +430,20 @@ export function renderUserStats(stats = {}){
 
 
 export function setNewGameButtonBusy(isBusy, text = 'Preparando partida...'){
-  const btn = document.getElementById('btn-new');
-  if(!btn) return;
-  btn.disabled = !!isBusy;
-  btn.classList.toggle('btn-disabled', !!isBusy);
-  btn.textContent = isBusy ? text : '▶ Nueva partida';
+  const buttons = [
+    document.getElementById('btn-start-center'),
+    document.getElementById('btn-new')
+  ].filter(Boolean);
+  buttons.forEach(btn => {
+    btn.disabled = !!isBusy;
+    btn.classList.toggle('btn-disabled', !!isBusy);
+    btn.textContent = isBusy ? text : (btn.id === 'btn-start-center' ? 'Comenzar juego' : '▶ Nueva partida');
+  });
+  const picker = document.getElementById('btn-mode-picker');
+  if(picker){
+    picker.disabled = !!isBusy;
+    picker.classList.toggle('btn-disabled', !!isBusy);
+  }
 }
 
 export function formatDuration(ms){
@@ -361,7 +478,90 @@ export function showVictoryAnimation({ tiempoMs, intentos, premio }){
   setTimeout(() => overlay.classList.add('show'), 20);
 }
 
+export function showOnlineVictoryAnimation({ winnerName = 'Jugador', reason = 'Partida online terminada.', pot = 0, cupText = '', autoCloseMs = 3200 } = {}){
+  const old = document.getElementById('victory-overlay');
+  if(old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'victory-overlay';
+  overlay.className = 'victory-overlay';
+  overlay.innerHTML = `
+    <div class="confetti-layer">${Array.from({ length: 42 }, (_, i) => `<span style="--i:${i}">*</span>`).join('')}</div>
+    <div class="victory-box">
+      <div class="victory-trophy">🏆</div>
+      <h2>Ganador</h2>
+      <p>${escapeHTML(reason)}</p>
+      <div class="victory-prize">${escapeHTML(winnerName)}</div>
+      <div class="victory-details">
+        ${pot ? `<span>Pozo: <strong>${formatMoney(pot)}</strong></span>` : ''}
+        ${cupText ? `<span>Copas: <strong>${escapeHTML(cupText)}</strong></span>` : ''}
+        <span>Volviendo al lobby...</span>
+      </div>
+      <button class="btn btn-green" id="victory-close">Buscar partida</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('victory-close')?.addEventListener('click', () => overlay.remove());
+  setTimeout(() => overlay.classList.add('show'), 20);
+  if(autoCloseMs > 0) setTimeout(() => overlay.remove(), autoCloseMs);
+}
+
 export function renderLeaderboard(ranking = session.cachedLeaderboard){
+  const list = document.getElementById('leaderboard-list');
+  if(!list) return;
+  const boards = Array.isArray(ranking) ? { solo:ranking, silver:[], gold:[] } : {
+    solo:ranking?.solo || [],
+    silver:ranking?.silver || [],
+    gold:ranking?.gold || []
+  };
+
+  const renderSolo = items => {
+    if(!items.length) return '<p class="empty">Aun nadie completa los 8 pares.</p>';
+    return items.map((item, idx) => {
+      const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
+      return `<div class="ranking-item">
+        <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, item.user || 'Jugador')}</div>
+        <div>
+          <div class="ranking-name ${isCurrent ? 'current':''}">#${idx + 1} ${escapeHTML(item.user || 'Jugador')}</div>
+          <div class="ranking-meta">${formatDuration(Number(item.tiempoMs || 0))} &middot; ${Number(item.intentos || 0)} intentos</div>
+        </div>
+        <div class="ranking-prize">${formatMoney(Number(item.premio || 10000))}</div>
+      </div>`;
+    }).join('');
+  };
+
+  const renderCups = (items, type) => {
+    const label = type === 'gold' ? 'Copa dorada' : 'Copa plata';
+    if(!items.length) return '<p class="empty">Aun no hay copas en este modo.</p>';
+    return items.map((item, idx) => {
+      const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
+      return `<div class="ranking-item">
+        <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, item.user || 'Jugador')}</div>
+        <div>
+          <div class="ranking-name ${isCurrent ? 'current':''}">#${idx + 1} ${escapeHTML(item.user || 'Jugador')}</div>
+          <div class="ranking-meta">${label}</div>
+        </div>
+        <div class="ranking-cups ranking-cups-${type}"><span>&#127942;</span>${Number(item.cups || 0)}</div>
+      </div>`;
+    }).join('');
+  };
+
+  list.innerHTML = `
+    <section class="ranking-section ranking-section-solo">
+      <h2>Solo: 8 pares acertados</h2>
+      ${renderSolo(boards.solo)}
+    </section>
+    <section class="ranking-section ranking-section-silver">
+      <h2>Duelo de Pares <span>Copas plata</span></h2>
+      ${renderCups(boards.silver, 'silver')}
+    </section>
+    <section class="ranking-section ranking-section-gold">
+      <h2>Duelo de Memoria <span>Copas doradas</span></h2>
+      ${renderCups(boards.gold, 'gold')}
+    </section>
+  `;
+}
+
+function renderLeaderboardLegacy(ranking = session.cachedLeaderboard){
   const list = document.getElementById('leaderboard-list');
   if(!list) return;
   if(!ranking.length){
@@ -405,7 +605,10 @@ export function renderLiveHistoryList(history = session.cachedLiveHistory){
 
 export function clearBoard(){
   const board = document.getElementById('board');
-  if(board) board.innerHTML = '';
+  if(board){
+    board.innerHTML = '';
+    delete board.dataset.layoutSignature;
+  }
   setStartPanelVisible(true);
 }
 
@@ -446,7 +649,7 @@ export function initProfileAvatars(){
         localStorage.setItem(getAvatarStorageKey(), avatar);
         if(session.currentUser){
           session.currentUser.avatar = avatar;
-          await updateUserAvatar(session.currentUser.uid, avatar).catch(() => {
+          if(!isGuestUser()) await updateUserAvatar(session.currentUser.uid, avatar).catch(() => {
             showMsg('No se pudo guardar el avatar en línea, pero quedó aplicado en este navegador.', 'warning');
           });
         }

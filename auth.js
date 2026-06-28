@@ -3,20 +3,23 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  deleteUser
+  deleteUser,
+  GoogleAuthProvider,
+  signInWithPopup
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
-import { auth } from './firebase-config.js';
-import { INITIAL_SALDO, forbiddenNames } from './constants.js';
-import { session, gameState, resetGameState } from './state.js';
-import { normalizeNickname, escapeHTML } from './utils.js';
+import { auth } from './firebase-config.js?v=71';
+import { INITIAL_SALDO, forbiddenNames } from './constants.js?v=71';
+import { session, gameState, resetGameState } from './state.js?v=71';
+import { normalizeNickname, escapeHTML } from './utils.js?v=71';
 import {
   nicknameTaken,
   reserveNickname,
   releaseNickname,
   getUserProfile,
-  createUserProfile
-} from './database.js';
+  createUserProfile,
+  makeUniqueNickname
+} from './database.js?v=72';
 import {
   setAuthModeUI,
   showAuthModal,
@@ -30,7 +33,19 @@ import {
   showRulesModalIfNeeded,
   resetAvatarDisplay,
   resetCardSkinDisplay
-} from './ui.js';
+} from './ui.js?v=73';
+
+const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
+const GUEST_STATS_KEY = 'memorabetGuestStats';
+const GUEST_PROFILE = {
+  uid: 'guest-local',
+  email: '',
+  nickname: 'Invitado',
+  avatar: 'assets/avatars/avatar-01.png',
+  ownedCardSkins: [],
+  selectedCardSkin: 'default',
+  isGuest: true
+};
 
 function isForbiddenNickname(name){
   const clean = normalizeNickname(name);
@@ -59,7 +74,11 @@ function mapAuthError(error){
     'auth/wrong-password':'Contraseña incorrecta.',
     'auth/user-not-found':'No existe una cuenta con ese correo.',
     'auth/too-many-requests':'Demasiados intentos. Espera un poco.',
-    'auth/network-request-failed':'Error de red. Revisa internet o Live Server.'
+    'auth/network-request-failed':'Error de red. Revisa internet o Live Server.',
+    'auth/popup-closed-by-user':'Se cerró la ventana de Google antes de terminar.',
+    'auth/popup-blocked':'El navegador bloqueó la ventana de Google.',
+    'auth/operation-not-allowed':'Google no está habilitado en Firebase Authentication.',
+    'auth/unauthorized-domain':'Este dominio no esta autorizado en Firebase. Agrega 127.0.0.1, localhost y la IP del computador en Authentication > Settings > Authorized domains.'
   };
   return map[error.code] || `Error: ${error.message}`;
 }
@@ -67,6 +86,187 @@ function mapAuthError(error){
 export function setAuthMode(mode){
   session.authMode = mode;
   setAuthModeUI(mode);
+}
+
+function getGuestBalance(){
+  const saved = Number(localStorage.getItem(GUEST_BALANCE_KEY));
+  return Number.isFinite(saved) && saved > 0 ? saved : INITIAL_SALDO;
+}
+
+function getGuestStats(){
+  try{
+    const stats = JSON.parse(localStorage.getItem(GUEST_STATS_KEY) || '{}');
+    return stats && typeof stats === 'object' ? stats : {};
+  }catch{
+    return {};
+  }
+}
+
+function updateAccountButton(){
+  const btn = document.getElementById('btn-change-user');
+  if(!btn) return;
+  btn.innerHTML = '&#9881;&#65039;';
+}
+
+function keepSettingsButtonLabel(){
+  const btn = document.getElementById('btn-change-user');
+  if(btn) btn.innerHTML = '&#9881;&#65039;';
+}
+
+function setSettingsVisible(isVisible){
+  const modal = document.getElementById('settings-modal');
+  if(!modal) return;
+  modal.classList.toggle('visible', isVisible);
+  modal.setAttribute('aria-hidden', String(!isVisible));
+}
+
+function showSettingsStatus(text, type='info'){
+  const status = document.getElementById('settings-status');
+  if(!status) return;
+  status.textContent = text;
+  status.className = `settings-status ${type}`;
+}
+
+function updateSettingsAccountUI(){
+  const status = document.getElementById('settings-account-status');
+  const logout = document.getElementById('btn-logout-account');
+  const google = document.getElementById('btn-google-account');
+  const register = document.getElementById('btn-email-register');
+  const login = document.getElementById('btn-email-login');
+  const isGuest = session.currentUser?.isGuest;
+  const hasAccount = session.currentUser && !isGuest;
+
+  if(status){
+    if(hasAccount) status.textContent = `Conectado como ${session.currentUser.nickname || session.currentUser.email || 'Jugador'}.`;
+    else status.textContent = 'Estas jugando como invitado. Enlaza una cuenta para guardar ranking, historial y compras.';
+  }
+  if(logout) logout.style.display = hasAccount ? 'block' : 'none';
+  if(google) google.textContent = hasAccount ? 'Cambiar a Google' : 'Enlazar con Google';
+  if(register) register.style.display = hasAccount ? 'none' : 'block';
+  if(login) login.style.display = hasAccount ? 'none' : 'block';
+}
+
+function resetLoggedOutUI(){
+  document.getElementById('player-name').textContent = 'Jugador';
+  resetGameState();
+  setNewGameButtonBusy(false);
+  clearBoard();
+  updateStats();
+  resetAvatarDisplay();
+  resetCardSkinDisplay();
+  const profileName = document.getElementById('profile-name');
+  if(profileName) profileName.textContent = 'Jugador';
+  updateAccountButton();
+  keepSettingsButtonLabel();
+}
+
+export async function enterGuestMode(){
+  session.currentUser = { ...GUEST_PROFILE };
+  session.pendingProfileUser = null;
+  session.isGuestMode = true;
+  if(auth.currentUser) await signOut(auth);
+  gameState.saldo = getGuestBalance();
+  hideAuthModal();
+  renderUser({
+    ...GUEST_PROFILE,
+    ...getGuestStats(),
+    saldo: gameState.saldo
+  });
+  updateStats();
+  updateAccountButton();
+  keepSettingsButtonLabel();
+  showMsg('Entraste como invitado. Puedes jugar ahora y crear una cuenta desde Configuración cuando quieras.', 'success');
+  showRulesModalIfNeeded();
+}
+
+export function openAccountSettings(){
+  showAuthModal();
+  setAuthMode('login');
+  const guestButton = document.getElementById('btn-guest');
+  if(guestButton) guestButton.textContent = session.currentUser?.isGuest ? 'Seguir como invitado' : 'Jugar como invitado';
+  showAuthError(session.currentUser?.isGuest ? 'Si inicias sesión o creas una cuenta, tu progreso se guardará en línea desde ese momento.' : '');
+}
+
+function openEmailAuth(mode){
+  setSettingsVisible(false);
+  showAuthModal();
+  setAuthMode(mode);
+  const guestButton = document.getElementById('btn-guest');
+  if(guestButton) guestButton.textContent = 'Seguir como invitado';
+  showAuthError(mode === 'register' ? 'Crea tu cuenta para guardar el progreso en línea.' : 'Ingresa para recuperar tu cuenta.');
+}
+
+async function ensureGoogleProfile(user){
+  let profile = await getUserProfile(user.uid);
+  if(profile) return profile;
+
+  const base = user.displayName || (user.email || '').split('@')[0] || 'jugador';
+  const cleanNickname = await makeUniqueNickname(base);
+  await reserveNickname(cleanNickname, user.uid);
+  profile = await createUserProfile(user.uid, {
+    nickname: cleanNickname,
+    email: user.email || ''
+  });
+  return profile;
+}
+
+async function handleGoogleAccount(){
+  showSettingsStatus('Abriendo Google...', 'info');
+  showAuthError('Abriendo Google...');
+  try{
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt:'select_account' });
+    session.registering = true;
+    const result = await signInWithPopup(auth, provider);
+    const profile = await ensureGoogleProfile(result.user);
+    session.isGuestMode = false;
+    session.currentUser = {
+      uid: result.user.uid,
+      email: result.user.email,
+      nickname: profile.nickname,
+      avatar: profile.avatar || '',
+      ownedCardSkins: profile.ownedCardSkins || [],
+      selectedCardSkin: profile.selectedCardSkin || 'default'
+    };
+    gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
+    renderUser(profile);
+    updateStats();
+    updateAccountButton();
+  keepSettingsButtonLabel();
+    updateSettingsAccountUI();
+    setSettingsVisible(false);
+    hideAuthModal();
+    showMsg(`Cuenta conectada como ${escapeHTML(profile.nickname)}.`, 'success');
+  }catch(error){
+    const message = error.code ? mapAuthError(error) : error.message;
+    showSettingsStatus(message, 'danger');
+    showAuthError(message);
+  }finally{
+    session.registering = false;
+  }
+}
+
+export function openSettingsPanel(){
+  updateSettingsAccountUI();
+  showSettingsStatus('');
+  keepSettingsButtonLabel();
+  setSettingsVisible(true);
+}
+
+export function initAccountSettings(){
+  document.getElementById('settings-close')?.addEventListener('click', () => setSettingsVisible(false));
+  document.getElementById('settings-modal')?.addEventListener('click', event => {
+    if(event.target?.id === 'settings-modal') setSettingsVisible(false);
+  });
+  document.getElementById('btn-google-account')?.addEventListener('click', handleGoogleAccount);
+  document.getElementById('auth-google')?.addEventListener('click', handleGoogleAccount);
+  document.getElementById('auth-google-choice')?.addEventListener('click', handleGoogleAccount);
+  document.getElementById('btn-email-register')?.addEventListener('click', () => openEmailAuth('register'));
+  document.getElementById('btn-email-login')?.addEventListener('click', () => openEmailAuth('login'));
+  document.getElementById('btn-logout-account')?.addEventListener('click', async () => {
+    setSettingsVisible(false);
+    await logoutUser();
+  });
 }
 
 export async function handleAuthSubmit(){
@@ -95,12 +295,15 @@ export async function handleAuthSubmit(){
       await reserveNickname(cleanNick, user.uid);
       const profile = await createUserProfile(user.uid, { nickname, email: user.email || '' });
       session.pendingProfileUser = null;
+      session.isGuestMode = false;
       session.currentUser = { uid: user.uid, email: user.email, nickname: profile.nickname, avatar: profile.avatar || '', ownedCardSkins: profile.ownedCardSkins || [], selectedCardSkin: profile.selectedCardSkin || 'default' };
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
       updateStats();
-      showMsg(`Perfil creado como ${escapeHTML(profile.nickname)}. Presiona Nueva partida para comenzar.`, 'success');
+      updateAccountButton();
+  keepSettingsButtonLabel();
+      showMsg(`Perfil creado como ${escapeHTML(profile.nickname)}. Presiona Comenzar juego para comenzar.`, 'success');
       showRulesModalIfNeeded();
       return;
     }
@@ -131,12 +334,15 @@ export async function handleAuthSubmit(){
       await reserveNickname(cleanNick, uid);
       reserved = true;
       const profile = await createUserProfile(uid, { nickname, email });
+      session.isGuestMode = false;
       session.currentUser = { uid, email: cred.user.email, nickname: profile.nickname, avatar: profile.avatar || '', ownedCardSkins: profile.ownedCardSkins || [], selectedCardSkin: profile.selectedCardSkin || 'default' };
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
       updateStats();
-      showMsg(`Cuenta creada como ${escapeHTML(profile.nickname)}. Presiona Nueva partida para comenzar.`, 'success');
+      updateAccountButton();
+  keepSettingsButtonLabel();
+      showMsg(`Cuenta creada como ${escapeHTML(profile.nickname)}. Presiona Comenzar juego para comenzar.`, 'success');
       showRulesModalIfNeeded();
     }catch(dbError){
       if(reserved) await releaseNickname(cleanNick).catch(() => {});
@@ -174,23 +380,22 @@ async function rebuildMissingProfile(user){
 export function listenAuthState(){
   onAuthStateChanged(auth, async (user) => {
     if(!user){
+      if(session.isGuestMode && session.currentUser?.isGuest){
+        updateAccountButton();
+  keepSettingsButtonLabel();
+        return;
+      }
       session.currentUser = null;
       session.pendingProfileUser = null;
+      session.isGuestMode = false;
       showAuthModal();
-      setAuthMode('login');
-      document.getElementById('player-name').textContent = 'Jugador';
-      resetGameState();
-      setNewGameButtonBusy(false);
-      clearBoard();
-      updateStats();
-      resetAvatarDisplay();
-      resetCardSkinDisplay();
-      const profileName = document.getElementById('profile-name');
-      if(profileName) profileName.textContent = 'Jugador';
+      setAuthMode('choice');
+      resetLoggedOutUI();
       return;
     }
 
     try{
+      session.isGuestMode = false;
       let profile = await getUserProfile(user.uid);
       if(!profile && session.registering){
         // Espera breve para evitar que el listener se adelante al guardado del perfil.
@@ -208,7 +413,9 @@ export function listenAuthState(){
       hideAuthModal();
       renderUser(profile);
       updateStats();
-      showMsg(`Bienvenido, ${escapeHTML(profile.nickname)}. Presiona Nueva partida para comenzar.`, 'info');
+      updateAccountButton();
+  keepSettingsButtonLabel();
+      showMsg(`Bienvenido, ${escapeHTML(profile.nickname)}. Presiona Comenzar juego para comenzar.`, 'info');
       showRulesModalIfNeeded();
     }catch(error){
       showAuthError(`No se pudo cargar el perfil: ${error.message}`);
@@ -220,3 +427,4 @@ export function listenAuthState(){
 export async function logoutUser(){
   await signOut(auth);
 }
+
