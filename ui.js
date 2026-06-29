@@ -1,7 +1,7 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
-import { gameState, session } from './state.js?v=71';
+import { gameState, session } from './state.js?v=72';
 import { escapeHTML, formatMoney } from './utils.js?v=71';
-import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=72';
+import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=74';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
 const AVATARS = Array.from({ length: 36 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
@@ -389,7 +389,9 @@ export function updateStats(){
 export function renderUser(profile){
   if(!profile) return;
   document.getElementById('player-name').textContent = profile.nickname || 'Jugador';
-  session.trophies = Number(profile.trophies || 0);
+  session.cups = Number(profile.cups ?? profile.goldCups ?? 0);
+  session.medals = Number(profile.medals ?? profile.silverCups ?? 0);
+  session.trophies = Number(profile.trophies ?? (session.cups + session.medals) ?? 0);
   const profileName = document.getElementById('profile-name');
   if(profileName) profileName.textContent = profile.nickname || 'Jugador';
   const profileAvatar = AVATARS.includes(profile.avatar) ? profile.avatar : getSelectedAvatar();
@@ -412,17 +414,22 @@ export function renderUserStats(stats = {}){
   const totalPairs = Number(stats.totalPairs || 0);
   const best = Number(stats.best || 0);
   const profit = Number(stats.profit || 0);
-  const trophies = Number(stats.trophies ?? session.trophies ?? 0);
+  const cups = Number(stats.cups ?? stats.goldCups ?? session.cups ?? 0);
+  const medals = Number(stats.medals ?? stats.silverCups ?? session.medals ?? 0);
 
-  const playerTrophies = document.getElementById('player-trophies');
-  const histTrophies = document.getElementById('hist-trophies');
+  const playerCups = document.getElementById('player-cups');
+  const playerMedals = document.getElementById('player-medals');
+  const histCups = document.getElementById('hist-cups');
+  const histMedals = document.getElementById('hist-medals');
   const histGames = document.getElementById('hist-games');
   const histAvg = document.getElementById('hist-avg');
   const histBest = document.getElementById('hist-best');
   const histProfit = document.getElementById('hist-profit');
 
-  if(playerTrophies) playerTrophies.textContent = trophies;
-  if(histTrophies) histTrophies.textContent = trophies;
+  if(playerCups) playerCups.textContent = cups;
+  if(playerMedals) playerMedals.textContent = medals;
+  if(histCups) histCups.textContent = cups;
+  if(histMedals) histMedals.textContent = medals;
   if(histGames) histGames.textContent = games;
   if(histAvg) histAvg.textContent = games ? (totalPairs/games).toFixed(2) : '0.00';
   if(histBest) histBest.textContent = `${best}/${TOTAL_PAIRS}`;
@@ -495,7 +502,7 @@ export function showOnlineVictoryAnimation({ winnerName = 'Jugador', reason = 'P
       <div class="victory-prize">${escapeHTML(winnerName)}</div>
       <div class="victory-details">
         ${pot ? `<span>Pozo: <strong>${formatMoney(pot)}</strong></span>` : ''}
-        ${cupText ? `<span>Copas: <strong>${escapeHTML(cupText)}</strong></span>` : ''}
+        ${cupText ? `<span>Premio: <strong>${escapeHTML(cupText)}</strong></span>` : ''}
         <span>Volviendo al lobby...</span>
       </div>
       <button class="btn btn-green" id="victory-close">Buscar partida</button>
@@ -531,8 +538,11 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
   };
 
   const renderCups = (items, type) => {
-    const label = type === 'gold' ? 'Copa dorada' : 'Copa plata';
-    if(!items.length) return '<p class="empty">Aun no hay copas en este modo.</p>';
+    const isGold = type === 'gold';
+    const label = isGold ? 'Copa dorada' : 'Medalla';
+    const empty = isGold ? 'Aun no hay copas en este modo.' : 'Aun no hay medallas en este modo.';
+    const icon = isGold ? '&#127942;' : '&#127941;';
+    if(!items.length) return `<p class="empty">${empty}</p>`;
     return items.map((item, idx) => {
       const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
       return `<div class="ranking-item">
@@ -541,7 +551,7 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
           <div class="ranking-name ${isCurrent ? 'current':''}">#${idx + 1} ${escapeHTML(item.user || 'Jugador')}</div>
           <div class="ranking-meta">${label}</div>
         </div>
-        <div class="ranking-cups ranking-cups-${type}"><span>&#127942;</span>${Number(item.cups || 0)}</div>
+        <div class="ranking-cups ranking-cups-${type}"><span>${icon}</span>${Number(item.cups || 0)}</div>
       </div>`;
     }).join('');
   };
@@ -555,7 +565,7 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
     silver:{
       title:'Duelo de Pares',
       label:'Pares',
-      badge:'Copas plata',
+      badge:'Medallas',
       body:renderCups(boards.silver, 'silver')
     },
     gold:{

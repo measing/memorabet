@@ -152,16 +152,33 @@ body::before{
 }
 .player-strip h2{font-size:18px;color:white;margin-bottom:6px;font-weight:900}
 .player-strip p{display:flex;align-items:center;color:var(--gold);font-size:20px;font-weight:900}
-.player-trophies{
-  gap:7px;
+.player-awards{
+  gap:11px;
+  flex-wrap:wrap;
+  line-height:1;
 }
-.trophy-icon{
+.player-award{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-width:max-content;
+}
+.player-award-medals{
+  color:#d8e4ef;
+}
+.trophy-icon,
+.medal-icon{
   display:inline-grid;
   place-items:center;
   width:22px;
   height:22px;
   font-size:16px;
+}
+.trophy-icon{
   filter:drop-shadow(0 0 7px rgba(255,190,40,.45));
+}
+.medal-icon{
+  filter:drop-shadow(0 0 7px rgba(216,228,239,.38));
 }
 .coin-icon{
   display:inline-grid;
@@ -777,9 +794,39 @@ body.online-duel-active .online-waiting-logo{
   display:grid;
   gap:18px;
 }
+.mode-tabs{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin:0 0 18px;
+  padding:6px;
+  border:1px solid rgba(249,199,79,.24);
+  border-radius:14px;
+  background:rgba(0,0,0,.36);
+}
+.mode-tab{
+  min-height:48px;
+  border:1px solid rgba(249,199,79,.3);
+  border-radius:10px;
+  color:#d8d8d8;
+  background:rgba(255,255,255,.06);
+  font-weight:900;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.mode-tab:hover,
+.mode-tab.active{
+  color:#0b0802;
+  background:linear-gradient(180deg,#ffd96a,#d88a0a);
+  border-color:#ffe398;
+  box-shadow:0 0 18px rgba(249,199,79,.24);
+}
 .mode-group{
   display:grid;
   gap:12px;
+}
+.mode-group[hidden]{
+  display:none!important;
 }
 .mode-group h3{
   margin:0;
@@ -1085,7 +1132,8 @@ body.online-duel-active #btn-exit{
   .player-avatar{width:52px;height:52px}
   .player-strip h2{font-size:16px;margin-bottom:3px}
   .player-strip p{font-size:17px}
-  .trophy-icon{width:19px;height:19px;font-size:14px}
+  .player-awards{gap:8px}
+  .trophy-icon,.medal-icon{width:19px;height:19px;font-size:14px}
   .coin-icon{width:19px;height:19px;font-size:12px;margin-right:5px}
   .casino-menu{
     grid-template-columns:repeat(3,minmax(0,1fr));
@@ -1194,6 +1242,15 @@ body.online-duel-active #btn-exit{
   }
   .mode-options{
     gap:16px;
+  }
+  .mode-tabs{
+    gap:7px;
+    margin-bottom:14px;
+    padding:5px;
+  }
+  .mode-tab{
+    min-height:42px;
+    font-size:13px;
   }
   .mode-group{
     gap:10px;

@@ -1,5 +1,5 @@
 import { ANIMAL_CARDS, K_MAX, TOTAL_PAIRS, G, C, ONLINE_WAGERS, ONLINE_WIN_CUPS, ONLINE_LOSE_CUPS } from './constants.js?v=72';
-import { createLocalDuelState, gameState, session } from './state.js?v=71';
+import { createLocalDuelState, gameState, session } from './state.js?v=72';
 import { shuffle, wait, formatMoney } from './utils.js?v=71';
 import {
   updateSaldo,
@@ -14,14 +14,15 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=72';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=73';
+} from './database.js?v=74';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=78';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=71';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
 let selectedGameMode = 'solo';
 let selectedOnlineWager = ONLINE_WAGERS[0];
+let selectedModeCategory = 'offline';
 let onlineRoomUnsubscribe = null;
 let activeOnlineRoom = null;
 let onlineStartTimer = null;
@@ -68,10 +69,14 @@ function randomInt(min, max){
 function syncCurrentUserEconomy(profile){
   if(!profile) return;
   if(Number.isFinite(Number(profile.saldo))) gameState.saldo = Number(profile.saldo);
-  if(Number.isFinite(Number(profile.trophies))) session.trophies = Number(profile.trophies);
+  session.cups = Number(profile.cups ?? profile.goldCups ?? session.cups ?? 0);
+  session.medals = Number(profile.medals ?? profile.silverCups ?? session.medals ?? 0);
+  session.trophies = Number(profile.trophies ?? (session.cups + session.medals) ?? 0);
   if(session.currentUser){
     session.currentUser.saldo = gameState.saldo;
     session.currentUser.trophies = session.trophies;
+    session.currentUser.cups = session.cups;
+    session.currentUser.medals = session.medals;
   }
   renderUserStats(profile);
   updateStats();
@@ -107,10 +112,12 @@ async function settleOnlineEconomy(room){
   const pot = Number(freshRoom.pot || wager * players.length || wager * 2);
   const winnerCups = randomInt(ONLINE_WIN_CUPS.min, ONLINE_WIN_CUPS.max);
   const loserCups = randomInt(ONLINE_LOSE_CUPS.min, ONLINE_LOSE_CUPS.max);
-  const cupType = freshRoom.mode === 'memory' ? 'gold' : 'silver';
+  const awardType = freshRoom.mode === 'memory' ? 'cup' : 'medal';
+  const cupType = awardType === 'cup' ? 'gold' : 'silver';
   const economyRewards = {
     pot,
     wager,
+    awardType,
     cupType,
     winnerUid:winner.uid,
     winnerName:winner.name || freshRoom.winnerName || 'Jugador',
@@ -125,8 +132,8 @@ async function settleOnlineEconomy(room){
     economyRewards
   });
 
-  const winnerProfile = await applyOnlineResult(winner.uid, { saldoDelta:pot, trophiesDelta:winnerCups, cupType });
-  const loserProfile = await applyOnlineResult(loser.uid, { trophiesDelta:-loserCups, cupType });
+  const winnerProfile = await applyOnlineResult(winner.uid, { saldoDelta:pot, trophiesDelta:winnerCups, awardType, cupType });
+  const loserProfile = await applyOnlineResult(loser.uid, { trophiesDelta:-loserCups, awardType, cupType });
 
   appliedOnlineEconomyRoomId = freshRoom.id;
   if(session.currentUser?.uid === winner.uid) syncCurrentUserEconomy(winnerProfile);
@@ -220,6 +227,7 @@ function ensureLocalDuelMeta(){
   if(!Array.isArray(duel.roundWins)) duel.roundWins = [0, 0];
   if(!Number.isFinite(duel.round) || duel.round < 1) duel.round = 1;
   if(!Number.isFinite(duel.suddenDeathStep)) duel.suddenDeathStep = 0;
+  if(![0, 1].includes(Number(duel.suddenDeathLead))) duel.suddenDeathLead = -1;
   duel.suddenDeath = !!duel.suddenDeath;
   duel.matchOver = !!duel.matchOver;
   duel.statusText = duel.statusText || '';
@@ -237,6 +245,7 @@ function startFreshLocalMatch(mode = 'classic'){
   gameState.localDuel.roundWins = [0, 0];
   gameState.localDuel.suddenDeath = false;
   gameState.localDuel.suddenDeathStep = 0;
+  gameState.localDuel.suddenDeathLead = -1;
   gameState.localDuel.matchOver = false;
   gameState.localDuel.statusText = '';
   resetLocalRoundScores();
@@ -394,22 +403,22 @@ function applyOnlineRoom(room){
   gameState.onlinePot = Number(room.pot || (gameState.onlineWager * Math.max(1, listFromFirebase(room.players).length)) || 0);
   if(room.economySettled && room.economyRewards && appliedOnlineEconomyRoomId !== room.id){
     const rewards = room.economyRewards;
+    const awardKey = (rewards.awardType === 'cup' || rewards.cupType === 'gold') ? 'cups' : 'medals';
     if(rewards.winnerUid === session.currentUser?.uid){
       gameState.saldo += Number(rewards.pot || 0);
-      session.trophies = Number(session.trophies || 0) + Number(rewards.winnerCups || 0);
+      session[awardKey] = Number(session[awardKey] || 0) + Number(rewards.winnerCups || 0);
     }else if(rewards.loserUid === session.currentUser?.uid){
-      session.trophies = Math.max(0, Number(session.trophies || 0) - Number(rewards.loserCups || 0));
+      session[awardKey] = Math.max(0, Number(session[awardKey] || 0) - Number(rewards.loserCups || 0));
     }
+    session.trophies = Number(session.cups || 0) + Number(session.medals || 0);
     if(session.currentUser){
       session.currentUser.saldo = gameState.saldo;
       session.currentUser.trophies = session.trophies;
+      session.currentUser.cups = session.cups;
+      session.currentUser.medals = session.medals;
     }
     appliedOnlineEconomyRoomId = room.id;
-    const trophyEls = [
-      document.getElementById('player-trophies'),
-      document.getElementById('hist-trophies')
-    ].filter(Boolean);
-    trophyEls.forEach(el => el.textContent = session.trophies);
+    renderUserStats(session.currentUser || session);
   }
   if(previousStatus === 'waiting' && ['ready', 'preview', 'playing'].includes(room.status)){
     playRivalFound();
@@ -427,11 +436,12 @@ function applyOnlineRoom(room){
     const isWinner = rewards.winnerUid === session.currentUser?.uid;
     const isLoser = rewards.loserUid === session.currentUser?.uid;
     const cupText = isWinner ? `+${Number(rewards.winnerCups || 0)}` : isLoser ? `-${Number(rewards.loserCups || 0)}` : '';
+    const awardLabel = (rewards.awardType === 'cup' || rewards.cupType === 'gold') ? 'Copas' : 'Medallas';
     showOnlineVictoryAnimation({
       winnerName,
       reason: room.concededBy ? `${winnerName} gana por abandono.` : `${winnerName} gana la partida online.`,
       pot:Number(rewards.pot || room.pot || 0),
-      cupText,
+      cupText:cupText ? `${awardLabel} ${cupText}` : '',
       autoCloseMs: 3200
     });
     setTimeout(() => resetOnlineClientToLobby('Volviste al lobby online. Puedes buscar otra partida.'), 3300);
@@ -443,6 +453,7 @@ function applyOnlineRoom(room){
   gameState.localDuel.round = Number(room.round || 1);
   gameState.localDuel.roundWins = listFromFirebase(room.roundWins).length ? listFromFirebase(room.roundWins) : [0, 0];
   gameState.localDuel.suddenDeath = !!room.suddenDeath;
+  gameState.localDuel.suddenDeathLead = [0, 1].includes(Number(room.suddenDeathLead)) ? Number(room.suddenDeathLead) : -1;
   gameState.localDuel.matchOver = room.status === 'finished' || !!room.matchOver;
   gameState.localDuel.statusText = getOnlineTurnText(room);
   gameState.localDuel.players = listFromFirebase(room.players).map((player, index) => ({
@@ -503,6 +514,7 @@ async function resolveOnlinePair(roomId, firstId, secondId){
   const current = Number(room.current || 0);
   const nextCurrent = current === 0 ? 1 : 0;
   const isMatch = a.animalId === b.animalId;
+  const suddenLead = [0, 1].includes(Number(room.suddenDeathLead)) ? Number(room.suddenDeathLead) : -1;
   let matched = Number(room.matched || 0);
   let status = 'playing';
   let matchOver = false;
@@ -571,6 +583,55 @@ async function resolveOnlinePair(roomId, firstId, secondId){
         roundWins,
         suddenDeath:round >= 3 && roundWins[0] === roundWins[1],
         suddenDeathStep:0,
+        suddenDeathLead:-1,
+        statusText
+      });
+      return;
+    }else if(room.mode === 'classic' && room.suddenDeath){
+      let nextLead = suddenLead;
+      if(nextLead < 0){
+        nextLead = current;
+        statusText = `${players[current].name} encontro un par. ${players[nextCurrent].name} debe defenderse`;
+      }else if(nextLead !== current){
+        nextLead = -1;
+        statusText = `${players[current].name} defendio el par. Sigue ${players[nextCurrent].name}`;
+      }else{
+        statusText = `${players[current].name} encontro otro par. ${players[nextCurrent].name} debe defenderse`;
+      }
+
+      if(matched >= TOTAL_PAIRS){
+        await updateOnlineRoom(roomId, {
+          status:'ready',
+          cards:[],
+          players:players.map(player => ({ ...player, score:0 })),
+          current:0,
+          flipped:[],
+          matched:0,
+          intentos:0,
+          resolving:false,
+          matchOver:false,
+          round:Number(room.round || 1) + 1,
+          roundWins:listFromFirebase(room.roundWins).length ? listFromFirebase(room.roundWins) : [0, 0],
+          suddenDeath:true,
+          suddenDeathStep:Number(room.suddenDeathStep || 0) + 1,
+          suddenDeathLead:-1,
+          statusText:'Muerte subita online sin ganador. Otra ronda'
+        });
+        return;
+      }
+
+      await updateOnlineRoom(roomId, {
+        status:'playing',
+        cards,
+        players,
+        current:nextCurrent,
+        flipped:[],
+        matched,
+        resolving:false,
+        matchOver:false,
+        suddenDeath:true,
+        suddenDeathStep:Number(room.suddenDeathStep || 0) + 1,
+        suddenDeathLead:nextLead,
         statusText
       });
       return;
@@ -583,7 +644,24 @@ async function resolveOnlinePair(roomId, firstId, secondId){
     a.flipped = false;
     b.flipped = false;
     if(room.mode === 'classic' && room.suddenDeath){
-      const winnerIndex = nextCurrent;
+      if(suddenLead < 0 || suddenLead === current){
+        await updateOnlineRoom(roomId, {
+          status:'playing',
+          cards,
+          players,
+          current:nextCurrent,
+          flipped:[],
+          matched,
+          resolving:false,
+          matchOver:false,
+          suddenDeath:true,
+          suddenDeathStep:Number(room.suddenDeathStep || 0) + 1,
+          suddenDeathLead:suddenLead,
+          statusText:`${players[current].name} fallo. Turno de ${players[nextCurrent]?.name || `Jugador ${nextCurrent + 1}`}`
+        });
+        return;
+      }
+      const winnerIndex = suddenLead;
       const roundWins = listFromFirebase(room.roundWins).length ? [...listFromFirebase(room.roundWins)] : [0, 0];
       roundWins[winnerIndex]++;
       await updateOnlineRoom(roomId, {
@@ -732,6 +810,7 @@ function completeLocalDuelRound(){
   if(roundNumber >= 3 && w1 === w2){
     duel.suddenDeath = true;
     duel.suddenDeathStep = 0;
+    duel.suddenDeathLead = -1;
     duel.round++;
     duel.statusText = 'Empate: muerte subita';
     return;
@@ -740,10 +819,13 @@ function completeLocalDuelRound(){
   duel.round++;
 }
 
-function finishSuddenDeathMiss(){
+function hasSuddenDeathLead(duel = gameState.localDuel){
+  return [0, 1].includes(Number(duel.suddenDeathLead));
+}
+
+function finishSuddenDeathWinner(winnerIndex){
   const duel = gameState.localDuel;
   ensureLocalDuelMeta();
-  const winnerIndex = duel.current === 0 ? 1 : 0;
   duel.roundWins[winnerIndex]++;
   duel.matchOver = true;
   duel.statusText = `${duel.players[winnerIndex].name} gana muerte subita`;
@@ -755,9 +837,78 @@ function finishSuddenDeathMiss(){
   updateStats();
 }
 
+function handleSuddenDeathMiss(){
+  const duel = gameState.localDuel;
+  ensureLocalDuelMeta();
+  const missIndex = duel.current;
+  const leadIndex = Number(duel.suddenDeathLead);
+
+  if(hasSuddenDeathLead(duel) && leadIndex !== missIndex){
+    finishSuddenDeathWinner(leadIndex);
+    return;
+  }
+
+  duel.suddenDeathStep++;
+  switchLocalTurn();
+  duel.statusText = `${duel.players[missIndex].name} fallo. Turno de ${currentLocalPlayer().name}`;
+  hideMsg();
+  updateStats();
+}
+
+async function handleSuddenDeathMatch(token){
+  const duel = gameState.localDuel;
+  ensureLocalDuelMeta();
+  const scorerIndex = duel.current;
+  const nextIndex = scorerIndex === 0 ? 1 : 0;
+  const leadIndex = Number(duel.suddenDeathLead);
+  duel.suddenDeathStep++;
+
+  if(!hasSuddenDeathLead(duel)){
+    duel.suddenDeathLead = scorerIndex;
+    duel.statusText = `${duel.players[scorerIndex].name} encontro un par. ${duel.players[nextIndex].name} debe defenderse`;
+  }else if(leadIndex !== scorerIndex){
+    duel.suddenDeathLead = -1;
+    duel.statusText = `${duel.players[scorerIndex].name} defendio el par. Sigue ${duel.players[nextIndex].name}`;
+  }else{
+    duel.statusText = `${duel.players[scorerIndex].name} encontro otro par. ${duel.players[nextIndex].name} debe defenderse`;
+  }
+
+  switchLocalTurn();
+  updateStats();
+
+  if(gameState.matched >= TOTAL_PAIRS){
+    gameState.playing = false;
+    gameState.blocked = true;
+    gameState.starting = false;
+    gameState.endTime = Date.now();
+    duel.suddenDeathLead = -1;
+    duel.statusText = 'Muerte subita sin ganador. Presiona Muerte subita para otra ronda';
+    hideMsg();
+    updateStats();
+    return;
+  }
+
+  gameState.blocked = true;
+  await wait(300);
+  const reshuffled = await animateShuffle(Math.max(.24, .72 - duel.suddenDeathStep * .08), false, token);
+  if(!reshuffled || token !== gameState.gameToken) return;
+  renderBoard(flipCard);
+  gameState.blocked = false;
+  updateStats();
+  hideMsg();
+}
+
 function updateSelectedGameModeUI(){
   document.querySelectorAll('[data-game-mode]').forEach(button => {
     button.classList.toggle('active', button.dataset.gameMode === selectedGameMode);
+  });
+  document.querySelectorAll('[data-mode-tab]').forEach(button => {
+    const isActive = button.dataset.modeTab === selectedModeCategory;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-selected', String(isActive));
+  });
+  document.querySelectorAll('[data-mode-panel]').forEach(panel => {
+    panel.hidden = panel.dataset.modePanel !== selectedModeCategory;
   });
   document.querySelectorAll('[data-online-wager]').forEach(button => {
     button.classList.toggle('active', Number(button.dataset.onlineWager) === selectedOnlineWager);
@@ -768,9 +919,15 @@ function updateSelectedGameModeUI(){
 
 export function setSelectedGameMode(mode){
   selectedGameMode = ['duel', 'memory-duel', 'online-duel', 'online-memory-duel'].includes(mode) ? mode : 'solo';
+  selectedModeCategory = selectedGameMode.startsWith('online') ? 'online' : 'offline';
   updateSelectedGameModeUI();
   const panel = document.getElementById('game-mode-panel');
   if(panel) panel.hidden = true;
+}
+
+export function setSelectedModeCategory(category){
+  selectedModeCategory = category === 'online' ? 'online' : 'offline';
+  updateSelectedGameModeUI();
 }
 
 export function setSelectedOnlineWager(value){
@@ -917,6 +1074,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
       gameState.localDuel.mode = localDuelMode;
       gameState.localDuel.current = 0;
       gameState.localDuel.statusText = '';
+      gameState.localDuel.suddenDeathLead = -1;
       resetLocalRoundScores();
     }else{
       startFreshLocalMatch(localDuelMode);
@@ -1161,25 +1319,15 @@ export function flipCard(id){
           hideMsg();
           updateStats();
         }
+        else if(isLocalDuelActive() && gameState.localDuel.suddenDeath){
+          await handleSuddenDeathMatch(token);
+        }
         else if(gameState.matched === TOTAL_PAIRS) endGame();
         else if(!isLocalDuelActive() && gameState.intentos >= K_MAX) endGame();
         else if(isMemoryDuelActive()){
           gameState.localDuel.statusText = `${currentLocalPlayer().name}: ${currentLocalPlayer().score}/${TOTAL_PAIRS} pares`;
           hideMsg();
           updateStats();
-        }
-        else if(isLocalDuelActive() && gameState.localDuel.suddenDeath){
-          gameState.blocked = true;
-          gameState.localDuel.suddenDeathStep++;
-          switchLocalTurn();
-          updateStats();
-          await wait(300);
-          const reshuffled = await animateShuffle(Math.max(.24, .72 - gameState.localDuel.suddenDeathStep * .08), false, token);
-          if(!reshuffled || token !== gameState.gameToken) return;
-          renderBoard(flipCard);
-          gameState.blocked = false;
-          updateStats();
-          hideMsg();
         }
         else if(isLocalDuelActive()) hideMsg();
         else showMsg(`Par encontrado. +${formatMoney(G)}.`, 'success');
@@ -1208,7 +1356,7 @@ export function flipCard(id){
           updateStats();
           hideMsg();
         }else if(isLocalDuelActive() && gameState.localDuel.suddenDeath){
-          finishSuddenDeathMiss();
+          handleSuddenDeathMiss();
         }else if(isLocalDuelActive()){
           switchLocalTurn();
           updateStats();

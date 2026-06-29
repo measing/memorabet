@@ -8,7 +8,9 @@ export const session = {
   isGuestMode: false,
   cachedLiveHistory: [],
   cachedLeaderboard: [],
-  trophies: 0
+  trophies: 0,
+  cups: 0,
+  medals: 0
 };
 
 export function createLocalDuelState(){
@@ -20,6 +22,7 @@ export function createLocalDuelState(){
     roundWins:[0, 0],
     suddenDeath:false,
     suddenDeathStep:0,
+    suddenDeathLead:-1,
     matchOver:false,
     statusText:'',
     players:[

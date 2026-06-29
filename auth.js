@@ -10,7 +10,7 @@ import {
 
 import { auth } from './firebase-config.js?v=71';
 import { INITIAL_SALDO, forbiddenNames } from './constants.js?v=71';
-import { session, gameState, resetGameState } from './state.js?v=71';
+import { session, gameState, resetGameState } from './state.js?v=72';
 import { normalizeNickname, escapeHTML } from './utils.js?v=71';
 import {
   nicknameTaken,
@@ -19,7 +19,7 @@ import {
   getUserProfile,
   createUserProfile,
   makeUniqueNickname
-} from './database.js?v=72';
+} from './database.js?v=74';
 import {
   setAuthModeUI,
   showAuthModal,
@@ -33,7 +33,7 @@ import {
   showRulesModalIfNeeded,
   resetAvatarDisplay,
   resetCardSkinDisplay
-} from './ui.js?v=73';
+} from './ui.js?v=78';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';

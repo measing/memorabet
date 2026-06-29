@@ -47,6 +47,8 @@ export async function createUserProfile(uid, { nickname, email }){
     best: 0,
     profit: 0,
     trophies: 0,
+    cups: 0,
+    medals: 0,
     silverCups: 0,
     goldCups: 0,
     createdAt: Date.now(),
@@ -60,16 +62,19 @@ export async function updateSaldo(uid, saldo){
   await update(ref(db, `users/${uid}`), { saldo, updatedAt: Date.now() });
 }
 
-export async function applyOnlineResult(uid, { saldoDelta = 0, trophiesDelta = 0, cupType = 'silver' } = {}){
+export async function applyOnlineResult(uid, { saldoDelta = 0, trophiesDelta = 0, awardType = '', cupType = 'silver' } = {}){
   const profile = await getUserProfile(uid) || {};
   const saldo = Math.max(0, Number(profile.saldo ?? INITIAL_SALDO) + Number(saldoDelta || 0));
-  const trophies = Math.max(0, Number(profile.trophies || 0) + Number(trophiesDelta || 0));
-  const cupField = cupType === 'gold' ? 'goldCups' : 'silverCups';
-  const currentCups = Number(profile[cupField] || 0);
+  const isCup = awardType === 'cup' || cupType === 'gold';
+  const awardField = isCup ? 'cups' : 'medals';
+  const legacyField = isCup ? 'goldCups' : 'silverCups';
+  const delta = Number(trophiesDelta || 0);
+  const currentAwards = Number(profile[awardField] ?? profile[legacyField] ?? 0);
+  const nextAwards = Math.max(0, currentAwards + delta);
   const patch = {
     saldo,
-    trophies,
-    [cupField]: Math.max(0, currentCups + Number(trophiesDelta || 0)),
+    [awardField]: nextAwards,
+    [legacyField]: nextAwards,
     updatedAt: Date.now()
   };
   await update(ref(db, `users/${uid}`), patch);
@@ -150,18 +155,18 @@ export function listenLeaderboard(callback){
   const stopUsers = onValue(ref(db, 'users'), snapshot => {
     const data = snapshot.val();
     const users = data ? Object.entries(data).map(([uid, profile]) => ({ uid, ...profile })) : [];
-    const cupRanking = field => users
+    const cupRanking = (field, fallbackField) => users
       .map(profile => ({
         uid:profile.uid,
         user:profile.nickname || profile.email || 'Jugador',
         avatar:profile.avatar,
-        cups:Number(profile[field] || 0)
+        cups:Number(profile[field] ?? profile[fallbackField] ?? 0)
       }))
       .filter(item => item.cups > 0)
       .sort((a,b) => b.cups - a.cups || String(a.user).localeCompare(String(b.user)))
       .slice(0, 10);
-    state.silver = cupRanking('silverCups');
-    state.gold = cupRanking('goldCups');
+    state.silver = cupRanking('medals', 'silverCups');
+    state.gold = cupRanking('cups', 'goldCups');
     emit();
   });
   return () => {
@@ -220,6 +225,7 @@ export async function createOnlineRoom(mode, player, wager = 0){
     roundWins: [0, 0],
     suddenDeath: false,
     suddenDeathStep: 0,
+    suddenDeathLead: -1,
     matchOver: false,
     statusText: 'Esperando rival online...',
     hostUid: player.uid,

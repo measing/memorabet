@@ -1,8 +1,8 @@
-import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings } from './auth.js?v=72';
-import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=74';
-import { listenLiveHistory, listenLeaderboard } from './database.js?v=72';
-import { session } from './state.js?v=71';
-import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=76';
+import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings } from './auth.js?v=74';
+import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=77';
+import { listenLiveHistory, listenLeaderboard } from './database.js?v=74';
+import { session } from './state.js?v=72';
+import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=78';
 import { initAudioControls } from './audio.js?v=71';
 
 function initMobileAppSupport(){
@@ -54,6 +54,9 @@ function bindEvents(){
   });
   document.querySelectorAll('[data-game-mode]').forEach(btn => {
     btn.addEventListener('click', () => setSelectedGameMode(btn.dataset.gameMode));
+  });
+  document.querySelectorAll('[data-mode-tab]').forEach(btn => {
+    btn.addEventListener('click', () => setSelectedModeCategory(btn.dataset.modeTab));
   });
   document.querySelectorAll('[data-online-wager]').forEach(btn => {
     btn.addEventListener('click', () => setSelectedOnlineWager(btn.dataset.onlineWager));
