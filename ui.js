@@ -209,17 +209,17 @@ export function setAuthModeUI(mode){
 
   const submit = document.getElementById('auth-submit');
   if(submit){
-    submit.style.display = isChoice ? 'none' : 'block';
+    submit.style.display = isChoice ? 'none' : 'flex';
     if(isRepair) submit.textContent = 'Guardar nickname';
     else submit.textContent = isRegister ? 'Crear cuenta' : 'Ingresar';
   }
 
   const guest = document.getElementById('btn-guest');
-  if(guest) guest.style.display = (isChoice || isLogin) ? 'block' : 'none';
+  if(guest) guest.style.display = (isChoice || isLogin) ? 'flex' : 'none';
   const google = document.getElementById('auth-google');
   if(google) google.style.display = 'none';
   const googleChoice = document.getElementById('auth-google-choice');
-  if(googleChoice) googleChoice.style.display = isChoice ? 'block' : 'none';
+  if(googleChoice) googleChoice.style.display = isChoice ? 'flex' : 'none';
   showAuthError('');
 }
 

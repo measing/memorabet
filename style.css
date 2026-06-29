@@ -1612,6 +1612,27 @@ body.online-duel-active #btn-exit{
   grid-template-columns:repeat(2,minmax(0,1fr));
   gap:10px;
 }
+.auth-box{
+  display:grid;
+  justify-items:center;
+}
+.auth-box .auth-tabs,
+.auth-box input,
+.auth-box #nickname-error{
+  width:100%;
+}
+.auth-box .btn{
+  justify-content:center;
+  align-items:center;
+}
+.auth-tab{
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  line-height:1.15;
+}
 
 .auth-tabs.choice-mode{
   grid-template-columns:1fr;

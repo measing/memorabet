@@ -2,7 +2,7 @@ import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, ente
 import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=74';
 import { listenLiveHistory, listenLeaderboard } from './database.js?v=72';
 import { session } from './state.js?v=71';
-import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=74';
+import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=76';
 import { initAudioControls } from './audio.js?v=71';
 
 function initMobileAppSupport(){
