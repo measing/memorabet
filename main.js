@@ -1,9 +1,9 @@
-import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings } from './auth.js?v=78';
-import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=79';
-import { listenLiveHistory, listenLeaderboard } from './database.js?v=75';
+import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=80';
+import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=80';
+import { listenLiveHistory, listenLeaderboard } from './database.js?v=76';
 import { session } from './state.js?v=72';
-import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=88';
-import { initAudioControls } from './audio.js?v=71';
+import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=90';
+import { initAudioControls } from './audio.js?v=73';
 
 window.__memorabetMainLoaded = true;
 
@@ -56,13 +56,13 @@ function bindEvents(){
     if(e.key === 'Enter') handleAuthSubmit();
   });
   document.getElementById('btn-change-user')?.addEventListener('click', openSettingsPanel);
-  document.getElementById('btn-start-center')?.addEventListener('click', () => {
-    if(!session.currentUser) openAuth('choice');
-    else startSelectedGame();
+  document.getElementById('btn-start-center')?.addEventListener('click', async () => {
+    if(!session.currentUser) await enterGuestMode({ silent:true });
+    await startSelectedGame();
   });
   document.getElementById('btn-start-login')?.addEventListener('click', () => openAuth('login'));
+  document.getElementById('btn-start-google')?.addEventListener('click', handleGoogleAccount);
   document.getElementById('btn-start-register')?.addEventListener('click', () => openAuth('register'));
-  document.getElementById('btn-start-guest')?.addEventListener('click', enterGuestMode);
   document.getElementById('btn-mode-picker')?.addEventListener('click', toggleGameModePanel);
   document.getElementById('mode-close-button')?.addEventListener('click', closeGameModePanel);
   document.getElementById('game-mode-panel')?.addEventListener('click', event => {

@@ -19,7 +19,7 @@ import {
   getUserProfile,
   createUserProfile,
   makeUniqueNickname
-} from './database.js?v=75';
+} from './database.js?v=76';
 import {
   setAuthModeUI,
   showAuthModal,
@@ -33,7 +33,7 @@ import {
   showRulesModalIfNeeded,
   resetAvatarDisplay,
   resetCardSkinDisplay
-} from './ui.js?v=88';
+} from './ui.js?v=90';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -160,7 +160,7 @@ function resetLoggedOutUI(){
   keepSettingsButtonLabel();
 }
 
-export async function enterGuestMode(){
+export async function enterGuestMode({ silent = false } = {}){
   session.currentUser = { ...GUEST_PROFILE };
   session.pendingProfileUser = null;
   session.isGuestMode = true;
@@ -175,8 +175,12 @@ export async function enterGuestMode(){
   updateStats();
   updateAccountButton();
   keepSettingsButtonLabel();
-  showMsg('Entraste como invitado. Puedes jugar ahora y crear una cuenta desde Configuración cuando quieras.', 'success');
-  showRulesModalIfNeeded();
+  if(silent){
+    showMsg('Presiona Comenzar juego para comenzar.', 'info');
+  }else{
+    showMsg('Entraste como invitado. Puedes jugar ahora y crear una cuenta desde Configuración cuando quieras.', 'success');
+    showRulesModalIfNeeded();
+  }
 }
 
 export function openAccountSettings(){
@@ -210,7 +214,7 @@ async function ensureGoogleProfile(user){
   return profile;
 }
 
-async function handleGoogleAccount(){
+export async function handleGoogleAccount(){
   showSettingsStatus('Abriendo Google...', 'info');
   showAuthError('Abriendo Google...');
   try{
@@ -392,12 +396,7 @@ export function listenAuthState(){
   keepSettingsButtonLabel();
         return;
       }
-      session.currentUser = null;
-      session.pendingProfileUser = null;
-      session.isGuestMode = false;
-      showAuthModal();
-      setAuthMode('choice');
-      resetLoggedOutUI();
+      await enterGuestMode({ silent:true });
       return;
     }
 

@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png" />
   <link rel="apple-touch-icon" href="assets/app-icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=90" />
+  <link rel="stylesheet" href="style.css?v=95" />
 </head>
 <body>
   <div id="auth-modal" class="nickname-modal" style="display:none">
@@ -85,15 +85,15 @@
       <section class="settings-section">
         <h3>Audio</h3>
         <label class="volume-row">
-          <span>General <strong id="volume-master-value">75%</strong></span>
+          <span>General <strong id="volume-master-value">50%</strong></span>
           <input id="volume-master" type="range" min="0" max="100" step="1" />
         </label>
         <label class="volume-row">
-          <span>Musica <strong id="volume-music-value">45%</strong></span>
+          <span>Musica <strong id="volume-music-value">50%</strong></span>
           <input id="volume-music" type="range" min="0" max="100" step="1" />
         </label>
         <label class="volume-row">
-          <span>Efectos <strong id="volume-effects-value">75%</strong></span>
+          <span>Efectos <strong id="volume-effects-value">50%</strong></span>
           <input id="volume-effects" type="range" min="0" max="100" step="1" />
         </label>
       </section>
@@ -102,6 +102,9 @@
 
   <main class="casino-shell">
     <aside class="casino-sidebar">
+      <div class="sidebar-logo" aria-hidden="true">
+        <img src="assets/memorabet-logo.png" alt="" />
+      </div>
       <nav class="casino-menu" aria-label="Menú principal">
         <button class="menu-item active" type="button" data-view-target="game" aria-current="page"><span class="menu-emoji" aria-hidden="true">&#127918;</span><span class="menu-label">Jugar</span></button>
         <button class="menu-item" type="button" data-view-target="store"><span class="menu-emoji" aria-hidden="true">&#128722;</span><span class="menu-label">Tienda</span></button>
@@ -136,7 +139,7 @@
           <div class="hud-cell"><span>Parejas:</span><strong id="pares">0 / 8</strong></div>
         </header>
 
-        <div id="msg" class="message info visible">Inicia sesión o crea una cuenta para comenzar.</div>
+        <div id="msg" class="message info visible">Presiona Comenzar juego para comenzar.</div>
 
         <section id="local-duel-panel" class="local-duel-panel" hidden>
           <div class="duel-player active" id="duel-player-1">
@@ -159,12 +162,12 @@
               <strong id="online-waiting-text">Buscando rival online...</strong>
             </div>
             <div class="start-actions">
-              <button class="start-game-button" id="btn-start-center" type="button">Comenzar juego</button>
               <div class="start-auth-actions" id="start-auth-actions">
                 <button class="start-auth-button" id="btn-start-login" type="button">Iniciar sesion</button>
+                <button class="start-auth-button google" id="btn-start-google" type="button">Google</button>
                 <button class="start-auth-button" id="btn-start-register" type="button">Crear cuenta</button>
-                <button class="start-auth-button guest" id="btn-start-guest" type="button">Jugar invitado</button>
               </div>
+              <button class="start-game-button" id="btn-start-center" type="button">Comenzar juego</button>
               <button class="mode-picker-button" id="btn-mode-picker" type="button">Elegir modo de juego</button>
               <p class="selected-mode-label" id="selected-mode-label"></p>
             </div>
@@ -332,17 +335,15 @@
           msg.className = 'message visible warning';
           msg.textContent = 'El JavaScript del juego no arranco desde file://. Abre abrir-memorabet.bat.';
         }
-        ['btn-start-center', 'btn-start-login', 'btn-start-register', 'btn-change-user'].forEach(function(id){
+        ['btn-start-center', 'btn-start-login', 'btn-start-google', 'btn-start-register', 'btn-change-user'].forEach(function(id){
           var button = document.getElementById(id);
           if(button) button.addEventListener('click', showLocalFileHelp);
         });
-        var guest = document.getElementById('btn-start-guest');
-        if(guest) guest.addEventListener('click', showLocalFileHelp);
       }
 
       setTimeout(installFallback, 800);
     })();
   </script>
-  <script type="module" src="main.js?v=94"></script>
+  <script type="module" src="main.js?v=100"></script>
 </body>
 </html>

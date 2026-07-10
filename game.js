@@ -14,8 +14,8 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=75';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=88';
+} from './database.js?v=76';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=90';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=71';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';

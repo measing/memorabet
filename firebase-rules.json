@@ -96,6 +96,25 @@
       }
     },
 
+    "leaderboard": {
+      ".read": true,
+      ".indexOn": ["tiempoMs", "pares", "t"],
+      "$entry": {
+        ".write": "auth != null && newData.child('uid').val() === auth.uid",
+        ".validate": "newData.hasChildren(['uid', 'user', 'tiempoMs', 'segundos', 'intentos', 'pares', 'premio', 't'])",
+        "uid": { ".validate": "newData.isString() && newData.val() === auth.uid" },
+        "user": { ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 20" },
+        "tiempoMs": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "segundos": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "intentos": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10" },
+        "pares": { ".validate": "newData.isNumber() && newData.val() >= 8 && newData.val() <= 8" },
+        "premio": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "avatar": { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "t": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
+        "$other": { ".validate": false }
+      }
+    },
+
     "rankingMedals": {
       ".read": true,
       "$uid": {
@@ -125,6 +144,23 @@
     },
 
     "historial": {
+      ".read": true,
+      ".indexOn": ["t"],
+      "$entry": {
+        ".write": "auth != null && newData.child('uid').val() === auth.uid",
+        ".validate": "newData.hasChildren(['uid', 'user', 'pares', 'intentos', 'net', 't'])",
+        "uid": { ".validate": "newData.isString() && newData.val() === auth.uid" },
+        "user": { ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 20" },
+        "pares": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 8" },
+        "intentos": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10" },
+        "net": { ".validate": "newData.isNumber()" },
+        "avatar": { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "t": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "liveHistory": {
       ".read": true,
       ".indexOn": ["t"],
       "$entry": {

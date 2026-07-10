@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-web-v92';
+const CACHE_NAME = 'memorabet-web-v99';
 
 const LOCAL_ASSETS = [
   './',
@@ -16,6 +16,7 @@ const LOCAL_ASSETS = [
   './utils.js',
   './manifest.webmanifest',
   './assets/logo.png',
+  './assets/memorabet-logo.png',
   './assets/casino-background.png',
   './assets/app-icon-192.png',
   './assets/app-icon-512.png',
@@ -40,7 +41,10 @@ const LOCAL_ASSETS = [
   './assets/card-backs/skin-inferno.png?v=2',
   './assets/card-backs/skin-radiant.png?v=2',
   './assets/card-backs/skin-tech.png?v=2',
-  './assets/sounds/rival-found.mp3'
+  './assets/sounds/rival-found.mp3',
+  './assets/sounds/casino-vip-7.mp3',
+  './assets/sounds/we-will-empty-this-casino.mp3',
+  './assets/sounds/casino-vip-1.mp3'
 ];
 
 const avatarAssets = Array.from({ length: 36 }, (_, index) => {

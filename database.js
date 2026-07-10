@@ -11,6 +11,41 @@ function fallbackAvatar(avatar){
   return avatar || avatarPool[Math.floor(Math.random() * avatarPool.length)];
 }
 
+function publicName(item = {}){
+  return item.user || item.name || item.nickname || item.winnerName || 'Jugador';
+}
+
+function normalizePublicEntry(item = {}, key = ''){
+  return {
+    ...item,
+    uid:item.uid || key,
+    user:publicName(item),
+    avatar:item.avatar || ''
+  };
+}
+
+function entriesFromData(data){
+  if(!data) return [];
+  if(Array.isArray(data)) return data.map((item, index) => normalizePublicEntry(item, String(index)));
+  if(typeof data === 'object'){
+    return Object.entries(data).map(([key, item]) => normalizePublicEntry(item, key));
+  }
+  return [];
+}
+
+function sortSoloRanking(items){
+  return items
+    .filter(item => Number(item.pares || 0) >= 8)
+    .sort((a,b) => {
+      const tiempoDiff = Number(a.tiempoMs || Infinity) - Number(b.tiempoMs || Infinity);
+      if(tiempoDiff !== 0) return tiempoDiff;
+      const intentosDiff = Number(a.intentos || Infinity) - Number(b.intentos || Infinity);
+      if(intentosDiff !== 0) return intentosDiff;
+      return Number(b.t || 0) - Number(a.t || 0);
+    })
+    .slice(0, 10);
+}
+
 function listFromFirebase(value){
   if(Array.isArray(value)) return value;
   if(value && typeof value === 'object'){
@@ -181,7 +216,7 @@ export async function updateUserStats(uid, { pares, net, saldo }){
 export async function addLiveHistory({ uid, user, pares, intentos, net, avatar }){
   await push(ref(db, 'historial'), {
     uid,
-    user,
+    user:user || 'Jugador',
     pares,
     intentos,
     net,
@@ -207,7 +242,7 @@ export async function addLeaderboardEntry({ uid, user, tiempoMs, intentos, pares
   if(!isBetter) return;
   await set(entryRef, {
     uid,
-    user,
+    user:user || 'Jugador',
     tiempoMs,
     segundos: Math.round(tiempoMs / 100) / 10,
     intentos,
@@ -219,56 +254,73 @@ export async function addLeaderboardEntry({ uid, user, tiempoMs, intentos, pares
 }
 
 export function listenLeaderboard(callback){
-  const state = { solo: [], silver: [], gold: [] };
-  const emit = () => callback({ ...state });
+  const state = { solo: [], legacySolo: [], silver: [], gold: [] };
+  const emit = () => callback({
+    solo:sortSoloRanking([...state.solo, ...state.legacySolo]),
+    silver:[...state.silver],
+    gold:[...state.gold]
+  });
 
   const stopSolo = onValue(query(ref(db, 'ranking'), limitToLast(80)), snapshot => {
-    const data = snapshot.val();
-    state.solo = data ? Object.values(data)
-      .filter(item => Number(item.pares || 0) >= 8)
-      .sort((a,b) => {
-        const tiempoDiff = Number(a.tiempoMs || Infinity) - Number(b.tiempoMs || Infinity);
-        if(tiempoDiff !== 0) return tiempoDiff;
-        const intentosDiff = Number(a.intentos || Infinity) - Number(b.intentos || Infinity);
-        if(intentosDiff !== 0) return intentosDiff;
-        return Number(b.t || 0) - Number(a.t || 0);
-      })
-      .slice(0, 10) : [];
+    state.solo = entriesFromData(snapshot.val());
+    emit();
+  });
+
+  const stopLegacySolo = onValue(query(ref(db, 'leaderboard'), limitToLast(80)), snapshot => {
+    state.legacySolo = entriesFromData(snapshot.val());
+    emit();
+  }, () => {
+    state.legacySolo = [];
     emit();
   });
 
   const stopMedals = onValue(ref(db, 'rankingMedals'), snapshot => {
-    const data = snapshot.val();
-    state.silver = data ? Object.values(data)
+    state.silver = entriesFromData(snapshot.val())
       .filter(item => Number(item.cups || 0) > 0)
       .sort((a,b) => Number(b.cups || 0) - Number(a.cups || 0) || String(a.user).localeCompare(String(b.user)))
-      .slice(0, 10) : [];
+      .slice(0, 10);
     emit();
   });
 
   const stopCups = onValue(ref(db, 'rankingCups'), snapshot => {
-    const data = snapshot.val();
-    state.gold = data ? Object.values(data)
+    state.gold = entriesFromData(snapshot.val())
       .filter(item => Number(item.cups || 0) > 0)
       .sort((a,b) => Number(b.cups || 0) - Number(a.cups || 0) || String(a.user).localeCompare(String(b.user)))
-      .slice(0, 10) : [];
+      .slice(0, 10);
     emit();
   });
 
   return () => {
     stopSolo();
+    stopLegacySolo();
     stopMedals();
     stopCups();
   };
 }
 
 export function listenLiveHistory(callback){
-  const q = query(ref(db, 'historial'), limitToLast(12));
-  return onValue(q, snapshot => {
-    const data = snapshot.val();
-    const history = data ? Object.values(data).sort((a,b)=>(b.t||0)-(a.t||0)) : [];
-    callback(history);
+  const state = { current: [], legacy: [] };
+  const emit = () => callback([...state.current, ...state.legacy]
+    .sort((a,b)=>(b.t||0)-(a.t||0))
+    .slice(0, 12));
+
+  const stopCurrent = onValue(query(ref(db, 'historial'), limitToLast(12)), snapshot => {
+    state.current = entriesFromData(snapshot.val());
+    emit();
   });
+
+  const stopLegacy = onValue(query(ref(db, 'liveHistory'), limitToLast(12)), snapshot => {
+    state.legacy = entriesFromData(snapshot.val());
+    emit();
+  }, () => {
+    state.legacy = [];
+    emit();
+  });
+
+  return () => {
+    stopCurrent();
+    stopLegacy();
+  };
 }
 
 export async function findWaitingOnlineRoom(mode, uid, wager = 0){

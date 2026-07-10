@@ -1,9 +1,10 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
 
 const root = __dirname;
-const port = 4173;
+const ports = [4173, 5173, 5174, 5175, 5176];
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -35,19 +36,44 @@ const server = http.createServer((req, res) => {
       send(res, 404, 'Not found');
       return;
     }
-    send(res, 200, data, types[path.extname(file)] || 'application/octet-stream');
+    res.writeHead(200, {
+      'Content-Type': types[path.extname(file)] || 'application/octet-stream',
+      'Cache-Control': 'no-store'
+    });
+    res.end(data);
   });
 });
 
-server.listen(port, '127.0.0.1', () => {
-  console.log(`MemoraBet listo en http://127.0.0.1:${port}/index.html`);
-  console.log('Deja esta ventana abierta mientras juegas.');
-});
+function openGame(url){
+  if(process.env.MEMORABET_NO_OPEN === '1') return;
+  exec(`start "" "${url}"`, () => {});
+}
 
-server.on('error', error => {
-  if(error.code === 'EADDRINUSE'){
-    console.log(`El puerto ${port} ya esta en uso. Abre http://127.0.0.1:${port}/index.html`);
-  }else{
-    console.error(error);
+function listenOnAvailablePort(index = 0){
+  const port = ports[index];
+  if(!port){
+    console.error('No se encontro un puerto libre para abrir MemoraBet.');
+    return;
   }
+
+  server.once('error', error => {
+    if(error.code === 'EADDRINUSE'){
+      console.log(`El puerto ${port} esta en uso. Probando otro...`);
+      listenOnAvailablePort(index + 1);
+    }else{
+      console.error(error);
+    }
+  });
+
+  server.listen(port, '127.0.0.1', () => {
+    const url = `http://127.0.0.1:${port}/index.html`;
+    console.log(`MemoraBet listo en ${url}`);
+    openGame(url);
+  });
+}
+
+listenOnAvailablePort();
+
+server.on('listening', () => {
+  console.log('Deja esta ventana abierta mientras juegas.');
 });

@@ -3,12 +3,21 @@ const MUSIC_ENABLED_KEY = 'memorabetMusicEnabled';
 const MASTER_VOLUME_KEY = 'memorabetMasterVolume';
 const MUSIC_VOLUME_KEY = 'memorabetMusicVolume';
 const EFFECTS_VOLUME_KEY = 'memorabetEffectsVolume';
+const AUDIO_DEFAULTS_VERSION_KEY = 'memorabetAudioDefaultsVersion';
+const AUDIO_DEFAULTS_VERSION = '2';
+const DEFAULT_VOLUME = 0.5;
+const MUSIC_TRACKS = [
+  'assets/sounds/casino-vip-7.mp3',
+  'assets/sounds/we-will-empty-this-casino.mp3',
+  'assets/sounds/casino-vip-1.mp3'
+];
 
 let audioCtx;
 let masterGain;
 let musicGain;
 let effectsGain;
-let musicTimer = null;
+let musicAudio = null;
+let currentMusicIndex = -1;
 let rivalFoundAudio = null;
 
 function clampVolume(value, fallback){
@@ -28,10 +37,13 @@ function setVolume(key, value){
 }
 
 function applyVolumes(){
-  if(!masterGain || !musicGain || !effectsGain) return;
-  masterGain.gain.value = isSoundEnabled() ? getVolume(MASTER_VOLUME_KEY, 0.75) : 0;
-  musicGain.gain.value = getVolume(MUSIC_VOLUME_KEY, 0.45) * 0.18;
-  effectsGain.gain.value = getVolume(EFFECTS_VOLUME_KEY, 0.75);
+  const master = getVolume(MASTER_VOLUME_KEY, DEFAULT_VOLUME);
+  const music = getVolume(MUSIC_VOLUME_KEY, DEFAULT_VOLUME);
+  const effects = getVolume(EFFECTS_VOLUME_KEY, DEFAULT_VOLUME);
+  if(masterGain) masterGain.gain.value = isSoundEnabled() ? master : 0;
+  if(musicGain) musicGain.gain.value = music;
+  if(effectsGain) effectsGain.gain.value = effects;
+  if(musicAudio) musicAudio.volume = isSoundEnabled() && isMusicEnabled() ? master * music : 0;
 }
 
 function getCtx(){
@@ -67,12 +79,13 @@ export function isSoundEnabled(){
 }
 
 export function isMusicEnabled(){
-  return isEnabled(MUSIC_ENABLED_KEY, false);
+  return isEnabled(MUSIC_ENABLED_KEY, true);
 }
 
 export async function unlockAudio(){
   const ctx = getCtx();
   if(ctx.state === 'suspended') await ctx.resume();
+  if(isMusicEnabled() && isSoundEnabled()) startMusic();
 }
 
 function tone({ freq, duration, type = 'sine', volume = 0.16, delay = 0, destination = null, respectSound = true }){
@@ -140,33 +153,60 @@ export function playMiss(){
   tone({ freq:135, duration:0.18, type:'sawtooth', volume:0.09, delay:0.12 });
 }
 
+export function playButtonClick(){
+  tone({ freq:620, duration:0.045, type:'triangle', volume:0.075 });
+  tone({ freq:980, duration:0.055, type:'sine', volume:0.055, delay:0.035 });
+}
+
 export function playRivalFound(){
   if(!isSoundEnabled()) return;
   if(!rivalFoundAudio) rivalFoundAudio = new Audio('assets/sounds/rival-found.mp3');
   rivalFoundAudio.pause();
   rivalFoundAudio.currentTime = 0;
-  rivalFoundAudio.volume = getVolume(MASTER_VOLUME_KEY, 0.75) * getVolume(EFFECTS_VOLUME_KEY, 0.75);
+  rivalFoundAudio.volume = getVolume(MASTER_VOLUME_KEY, DEFAULT_VOLUME) * getVolume(EFFECTS_VOLUME_KEY, DEFAULT_VOLUME);
   rivalFoundAudio.play().catch(() => {});
 }
 
-function playMusicPulse(){
-  if(!isMusicEnabled() || !isSoundEnabled()) return;
-  tone({ freq:110, duration:0.38, type:'sine', volume:0.16, destination:musicGain, respectSound:false });
-  tone({ freq:220, duration:0.22, type:'triangle', volume:0.12, delay:0.18, destination:musicGain, respectSound:false });
+function pickMusicTrackIndex(){
+  if(MUSIC_TRACKS.length <= 1) return 0;
+  let next = currentMusicIndex;
+  while(next === currentMusicIndex){
+    next = Math.floor(Math.random() * MUSIC_TRACKS.length);
+  }
+  return next;
 }
 
 function startMusic(){
-  stopMusic();
-  if(!isMusicEnabled()) return;
-  playMusicPulse();
-  musicTimer = setInterval(playMusicPulse, 1800);
+  if(!isMusicEnabled() || !isSoundEnabled()) return;
+  if(musicAudio && !musicAudio.paused) return;
+
+  currentMusicIndex = pickMusicTrackIndex();
+  musicAudio = new Audio(MUSIC_TRACKS[currentMusicIndex]);
+  musicAudio.preload = 'auto';
+  musicAudio.addEventListener('ended', () => {
+    musicAudio = null;
+    startMusic();
+  }, { once:true });
+  applyVolumes();
+  musicAudio.play().catch(() => {});
 }
 
 function stopMusic(){
-  if(musicTimer){
-    clearInterval(musicTimer);
-    musicTimer = null;
+  if(musicAudio){
+    musicAudio.pause();
+    musicAudio.currentTime = 0;
+    musicAudio = null;
   }
+}
+
+function ensureAudioDefaults(){
+  if(localStorage.getItem(AUDIO_DEFAULTS_VERSION_KEY) === AUDIO_DEFAULTS_VERSION) return;
+  localStorage.setItem(MASTER_VOLUME_KEY, String(DEFAULT_VOLUME));
+  localStorage.setItem(MUSIC_VOLUME_KEY, String(DEFAULT_VOLUME));
+  localStorage.setItem(EFFECTS_VOLUME_KEY, String(DEFAULT_VOLUME));
+  localStorage.setItem(SOUND_ENABLED_KEY, 'true');
+  localStorage.setItem(MUSIC_ENABLED_KEY, 'true');
+  localStorage.setItem(AUDIO_DEFAULTS_VERSION_KEY, AUDIO_DEFAULTS_VERSION);
 }
 
 function updateSoundButtons(){
@@ -189,9 +229,9 @@ function updateSoundButtons(){
 
 function updateVolumeControls(){
   const controls = [
-    ['volume-master', 'volume-master-value', MASTER_VOLUME_KEY, 0.75],
-    ['volume-music', 'volume-music-value', MUSIC_VOLUME_KEY, 0.45],
-    ['volume-effects', 'volume-effects-value', EFFECTS_VOLUME_KEY, 0.75]
+    ['volume-master', 'volume-master-value', MASTER_VOLUME_KEY, DEFAULT_VOLUME],
+    ['volume-music', 'volume-music-value', MUSIC_VOLUME_KEY, DEFAULT_VOLUME],
+    ['volume-effects', 'volume-effects-value', EFFECTS_VOLUME_KEY, DEFAULT_VOLUME]
   ];
 
   controls.forEach(([inputId, valueId, key, fallback]) => {
@@ -213,16 +253,26 @@ function bindVolumeControl(inputId, key, fallback){
   });
 }
 
+function bindButtonSounds(){
+  document.addEventListener('click', event => {
+    const button = event.target instanceof Element ? event.target.closest('button') : null;
+    if(!button || button.disabled || button.classList.contains('btn-disabled')) return;
+    playButtonClick();
+  });
+}
+
 export function initAudioControls(){
+  ensureAudioDefaults();
   updateSoundButtons();
   updateVolumeControls();
 
   document.addEventListener('pointerdown', unlockAudio, { once:true });
   document.addEventListener('keydown', unlockAudio, { once:true });
+  bindButtonSounds();
 
-  bindVolumeControl('volume-master', MASTER_VOLUME_KEY, 0.75);
-  bindVolumeControl('volume-music', MUSIC_VOLUME_KEY, 0.45);
-  bindVolumeControl('volume-effects', EFFECTS_VOLUME_KEY, 0.75);
+  bindVolumeControl('volume-master', MASTER_VOLUME_KEY, DEFAULT_VOLUME);
+  bindVolumeControl('volume-music', MUSIC_VOLUME_KEY, DEFAULT_VOLUME);
+  bindVolumeControl('volume-effects', EFFECTS_VOLUME_KEY, DEFAULT_VOLUME);
 
   document.getElementById('btn-sound')?.addEventListener('click', async () => {
     await unlockAudio();

@@ -1,7 +1,7 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
 import { gameState, session } from './state.js?v=72';
 import { escapeHTML, formatMoney } from './utils.js?v=71';
-import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=75';
+import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=76';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
 const AVATARS = Array.from({ length: 36 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
@@ -179,6 +179,10 @@ function renderEntryAvatar(avatar, label){
   return `<span>${escapeHTML(value || '●')}</span>`;
 }
 
+function getEntryName(item){
+  return item?.user || item?.name || item?.nickname || item?.winnerName || 'Jugador';
+}
+
 export function setAuthModeUI(mode){
   const isChoice = mode === 'choice';
   const isLogin = mode === 'login';
@@ -335,7 +339,7 @@ export function updateStats(){
   document.body.classList.toggle('game-controls-active', controlsActive);
   document.body.classList.toggle('local-duel-active', localDuel);
   document.body.classList.toggle('online-duel-active', onlineDuel);
-  if(startAuthActions) startAuthActions.hidden = !!session.currentUser;
+  if(startAuthActions) startAuthActions.hidden = !!session.currentUser && !session.currentUser.isGuest;
   startPanel?.classList.toggle('online-searching', onlineSearching);
   if(onlineWaiting) onlineWaiting.hidden = !onlineSearching;
   if(onlineWaitingText){
@@ -541,9 +545,9 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
     return items.map((item, idx) => {
       const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
       return `<div class="ranking-item">
-        <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, item.user || 'Jugador')}</div>
+        <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, getEntryName(item))}</div>
         <div>
-          <div class="ranking-name ${isCurrent ? 'current':''}">#${idx + 1} ${escapeHTML(item.user || 'Jugador')}</div>
+          <div class="ranking-name ${isCurrent ? 'current':''}">#${idx + 1} ${escapeHTML(getEntryName(item))}</div>
           <div class="ranking-meta">${formatDuration(Number(item.tiempoMs || 0))} &middot; ${Number(item.intentos || 0)} intentos</div>
         </div>
         <div class="ranking-prize">${formatMoney(Number(item.premio || 10000))}</div>
@@ -560,9 +564,9 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
     return items.map((item, idx) => {
       const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
       return `<div class="ranking-item">
-        <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, item.user || 'Jugador')}</div>
+        <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, getEntryName(item))}</div>
         <div>
-          <div class="ranking-name ${isCurrent ? 'current':''}">#${idx + 1} ${escapeHTML(item.user || 'Jugador')}</div>
+          <div class="ranking-name ${isCurrent ? 'current':''}">#${idx + 1} ${escapeHTML(getEntryName(item))}</div>
           <div class="ranking-meta">${label}</div>
         </div>
         <div class="ranking-cups ranking-cups-${type}"><span>${icon}</span>${Number(item.cups || 0)}</div>
@@ -626,9 +630,9 @@ function renderLeaderboardLegacy(ranking = session.cachedLeaderboard){
     const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
     const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
     return `<div class="ranking-item">
-      <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, item.user || 'Jugador')}</div>
+      <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, getEntryName(item))}</div>
       <div>
-        <div class="ranking-name ${isCurrent ? 'current':''}">${medal} ${escapeHTML(item.user || 'Jugador')}</div>
+        <div class="ranking-name ${isCurrent ? 'current':''}">${medal} ${escapeHTML(getEntryName(item))}</div>
         <div class="ranking-meta">${formatDuration(Number(item.tiempoMs || 0))} · ${Number(item.intentos || 0)} intentos</div>
       </div>
       <div class="ranking-prize">${formatMoney(Number(item.premio || 10000))}</div>
@@ -645,12 +649,13 @@ export function renderLiveHistoryList(history = session.cachedLiveHistory){
   }
 
   list.innerHTML = history.map(item => {
-    const isCurrent = session.currentUser && item.user === session.currentUser.nickname;
+    const name = getEntryName(item);
+    const isCurrent = session.currentUser && name === session.currentUser.nickname;
     const secs = Math.max(0, Math.floor((Date.now() - (item.t || Date.now()))/1000));
     const when = secs < 8 ? 'Ahora mismo' : `Hace ${secs} seg`;
     return `<div class="live-item">
-      <div class="entry-avatar live-avatar">${renderEntryAvatar(item.avatar, item.user || 'Jugador')}</div>
-      <div><div class="live-name ${isCurrent ? 'current':''}">${escapeHTML(item.user)}</div><div class="live-time">${when}</div></div>
+      <div class="entry-avatar live-avatar">${renderEntryAvatar(item.avatar, name)}</div>
+      <div><div class="live-name ${isCurrent ? 'current':''}">${escapeHTML(name)}</div><div class="live-time">${when}</div></div>
       <div class="live-score">${item.pares}/${TOTAL_PAIRS}</div>
     </div>`;
   }).join('');
