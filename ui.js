@@ -1,7 +1,7 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
 import { gameState, session } from './state.js?v=72';
 import { escapeHTML, formatMoney } from './utils.js?v=71';
-import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=76';
+import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=77';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
 const AVATARS = Array.from({ length: 36 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
@@ -563,13 +563,14 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
     if(!items.length) return `<p class="empty">${empty}</p>`;
     return items.map((item, idx) => {
       const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
+      const count = Number(item.cups ?? item.goldCups ?? item.medals ?? item.silverCups ?? item.trophies ?? 0);
       return `<div class="ranking-item">
         <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, getEntryName(item))}</div>
         <div>
           <div class="ranking-name ${isCurrent ? 'current':''}">#${idx + 1} ${escapeHTML(getEntryName(item))}</div>
           <div class="ranking-meta">${label}</div>
         </div>
-        <div class="ranking-cups ranking-cups-${type}"><span>${icon}</span>${Number(item.cups || 0)}</div>
+        <div class="ranking-cups ranking-cups-${type}"><span>${icon}</span>${count}</div>
       </div>`;
     }).join('');
   };

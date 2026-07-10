@@ -18,8 +18,9 @@ import {
   releaseNickname,
   getUserProfile,
   createUserProfile,
+  syncPublicAwardRankings,
   makeUniqueNickname
-} from './database.js?v=76';
+} from './database.js?v=77';
 import {
   setAuthModeUI,
   showAuthModal,
@@ -33,7 +34,7 @@ import {
   showRulesModalIfNeeded,
   resetAvatarDisplay,
   resetCardSkinDisplay
-} from './ui.js?v=90';
+} from './ui.js?v=91';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -234,6 +235,7 @@ export async function handleGoogleAccount(){
     };
     gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
     renderUser(profile);
+    syncPublicAwardRankings(result.user.uid, profile).catch(() => {});
     updateStats();
     updateAccountButton();
   keepSettingsButtonLabel();
@@ -304,6 +306,7 @@ export async function handleAuthSubmit(){
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
+      syncPublicAwardRankings(user.uid, profile).catch(() => {});
       updateStats();
       updateAccountButton();
   keepSettingsButtonLabel();
@@ -344,6 +347,7 @@ export async function handleAuthSubmit(){
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
+      syncPublicAwardRankings(uid, profile).catch(() => {});
       updateStats();
       updateAccountButton();
   keepSettingsButtonLabel();
@@ -418,6 +422,7 @@ export function listenAuthState(){
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
+      syncPublicAwardRankings(user.uid, profile).catch(() => {});
       updateStats();
       updateAccountButton();
   keepSettingsButtonLabel();

@@ -24,6 +24,16 @@ function normalizePublicEntry(item = {}, key = ''){
   };
 }
 
+function publicAwardCount(item = {}){
+  return Number(item.cups ?? item.goldCups ?? item.medals ?? item.silverCups ?? item.trophies ?? 0);
+}
+
+function publicRankingName(profile = {}){
+  const rawName = String(profile.nickname || profile.user || profile.name || profile.email || 'Jugador').trim();
+  const name = rawName.length > 20 ? rawName.slice(0, 20) : rawName;
+  return name.length >= 3 ? name : 'Jugador';
+}
+
 function entriesFromData(data){
   if(!data) return [];
   if(Array.isArray(data)) return data.map((item, index) => normalizePublicEntry(item, String(index)));
@@ -185,6 +195,22 @@ export async function applyOnlineResult(uid, { saldoDelta = 0, trophiesDelta = 0
   return nextProfile;
 }
 
+export async function syncPublicAwardRankings(uid, profile = {}){
+  if(!uid) return;
+  const user = publicRankingName(profile);
+  const avatar = profile.avatar || '';
+  const cups = Number(profile.cups ?? profile.goldCups ?? 0);
+  const medals = Number(profile.medals ?? profile.silverCups ?? 0);
+  const updates = [];
+  if(cups > 0){
+    updates.push(set(ref(db, `rankingCups/${uid}`), { uid, user, avatar, cups, t:now() }));
+  }
+  if(medals > 0){
+    updates.push(set(ref(db, `rankingMedals/${uid}`), { uid, user, avatar, cups:medals, t:now() }));
+  }
+  await Promise.all(updates);
+}
+
 export async function updateUserAvatar(uid, avatar){
   await update(ref(db, `users/${uid}`), { avatar, updatedAt: now() });
   await updatePublicAvatar(uid, avatar).catch(() => {});
@@ -276,6 +302,7 @@ export function listenLeaderboard(callback){
 
   const stopMedals = onValue(ref(db, 'rankingMedals'), snapshot => {
     state.silver = entriesFromData(snapshot.val())
+      .map(item => ({ ...item, cups:publicAwardCount(item) }))
       .filter(item => Number(item.cups || 0) > 0)
       .sort((a,b) => Number(b.cups || 0) - Number(a.cups || 0) || String(a.user).localeCompare(String(b.user)))
       .slice(0, 10);
@@ -284,6 +311,7 @@ export function listenLeaderboard(callback){
 
   const stopCups = onValue(ref(db, 'rankingCups'), snapshot => {
     state.gold = entriesFromData(snapshot.val())
+      .map(item => ({ ...item, cups:publicAwardCount(item) }))
       .filter(item => Number(item.cups || 0) > 0)
       .sort((a,b) => Number(b.cups || 0) - Number(a.cups || 0) || String(a.user).localeCompare(String(b.user)))
       .slice(0, 10);
