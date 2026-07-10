@@ -1,7 +1,7 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
 import { gameState, session } from './state.js?v=72';
 import { escapeHTML, formatMoney } from './utils.js?v=71';
-import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=74';
+import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=75';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
 const AVATARS = Array.from({ length: 36 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
@@ -11,10 +11,14 @@ const CARD_SKIN_SELECTED_KEY = 'memorabetSelectedCardSkin';
 const DEFAULT_CARD_SKIN_ID = 'default';
 const CARD_SKINS = [
   { id:DEFAULT_CARD_SKIN_ID, name:'Predeterminado', price:0, src:'', default:true },
-  { id:'red', name:'Carta Roja', price:15000, src:'assets/card-backs/skin-red.png' },
-  { id:'green', name:'Carta Verde', price:15000, src:'assets/card-backs/skin-green.png' },
-  { id:'blue', name:'Carta Azul', price:15000, src:'assets/card-backs/skin-blue.png' },
-  { id:'gold', name:'Carta Dorada', price:20000, src:'assets/card-backs/skin-gold.png' }
+  { id:'galaxy', name:'Galaxia dorada', price:15000, src:'assets/card-backs/skin-galaxy.png?v=2' },
+  { id:'arcane', name:'Runas moradas', price:15000, src:'assets/card-backs/skin-arcane.png?v=2' },
+  { id:'forest', name:'Bosque esmeralda', price:15000, src:'assets/card-backs/skin-forest.png?v=2' },
+  { id:'storm', name:'Tormenta azul', price:15000, src:'assets/card-backs/skin-storm.png?v=2' },
+  { id:'royal', name:'Corona negra', price:15000, src:'assets/card-backs/skin-royal.png?v=2' },
+  { id:'inferno', name:'Fuego infernal', price:15000, src:'assets/card-backs/skin-inferno.png?v=2' },
+  { id:'radiant', name:'Luz radiante', price:15000, src:'assets/card-backs/skin-radiant.png?v=2' },
+  { id:'tech', name:'Esmeralda tech', price:15000, src:'assets/card-backs/skin-tech.png?v=2' }
 ];
 let selectedRankingBoard = 'solo';
 
@@ -186,14 +190,16 @@ export function setAuthModeUI(mode){
 
   const tabs = document.querySelector('.auth-tabs');
   if(tabs){
-    tabs.style.display = isRepair ? 'none' : 'grid';
+    tabs.style.display = isChoice ? 'grid' : 'none';
     tabs.classList.toggle('choice-mode', isChoice);
   }
 
   const loginTab = document.getElementById('tab-login');
   const registerTab = document.getElementById('tab-register');
+  const backButton = document.getElementById('auth-back');
   if(loginTab) loginTab.textContent = isChoice ? 'Iniciar sesion' : 'Ingresar';
   if(registerTab) registerTab.textContent = 'Crear cuenta';
+  if(backButton) backButton.style.display = isChoice ? 'none' : 'inline-flex';
 
   const email = document.getElementById('auth-email');
   const pass = document.getElementById('auth-password');
@@ -215,7 +221,7 @@ export function setAuthModeUI(mode){
   }
 
   const guest = document.getElementById('btn-guest');
-  if(guest) guest.style.display = (isChoice || isLogin) ? 'flex' : 'none';
+  if(guest) guest.style.display = isChoice ? 'flex' : 'none';
   const google = document.getElementById('auth-google');
   if(google) google.style.display = 'none';
   const googleChoice = document.getElementById('auth-google-choice');
@@ -225,11 +231,13 @@ export function setAuthModeUI(mode){
 
 export function showAuthModal(){
   const modal = document.getElementById('auth-modal');
+  document.body.classList.add('auth-modal-open');
   if(modal) modal.style.display = 'flex';
 }
 
 export function hideAuthModal(){
   const modal = document.getElementById('auth-modal');
+  document.body.classList.remove('auth-modal-open');
   if(modal) modal.style.display = 'none';
 }
 
@@ -260,6 +268,10 @@ export function setStartPanelVisible(isVisible){
 export function renderBoard(onCardClick){
   const board = document.getElementById('board');
   if(!board) return;
+  const selectedSkin = getSelectedCardSkin();
+  const skinMarkup = selectedSkin && !selectedSkin.default
+    ? `<img class="card-back-img" src="${escapeHTML(selectedSkin.src)}" alt="" draggable="false" />`
+    : '';
   setStartPanelVisible(false);
   board.innerHTML = '';
 
@@ -269,7 +281,7 @@ export function renderBoard(onCardClick){
     wrap.dataset.id = card.id;
     wrap.innerHTML = `
       <div class="card-inner">
-        <div class="card-face card-back"></div>
+        <div class="card-face card-back${skinMarkup ? ' has-skin' : ''}">${skinMarkup}</div>
         <div class="card-face card-front">
           <img class="animal-card-img" src="${escapeHTML(card.src)}" alt="${escapeHTML(card.name)}" />
         </div>
@@ -298,6 +310,7 @@ export function updateStats(){
   const onlineSearching = ['searching', 'waiting', 'ready'].includes(onlineStatus);
   const roundActive = gameState.starting || gameState.playing || gameState.cards.length > 0;
   const startPanel = document.getElementById('start-game-panel');
+  const startAuthActions = document.getElementById('start-auth-actions');
   const onlineWaiting = document.getElementById('online-waiting');
   const onlineWaitingText = document.getElementById('online-waiting-text');
   const controlsActive = roundActive && (!!startPanel?.classList.contains('hidden') || onlineDuel);
@@ -322,6 +335,7 @@ export function updateStats(){
   document.body.classList.toggle('game-controls-active', controlsActive);
   document.body.classList.toggle('local-duel-active', localDuel);
   document.body.classList.toggle('online-duel-active', onlineDuel);
+  if(startAuthActions) startAuthActions.hidden = !!session.currentUser;
   startPanel?.classList.toggle('online-searching', onlineSearching);
   if(onlineWaiting) onlineWaiting.hidden = !onlineSearching;
   if(onlineWaitingText){

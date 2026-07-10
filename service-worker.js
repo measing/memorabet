@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-web-v87';
+const CACHE_NAME = 'memorabet-web-v92';
 
 const LOCAL_ASSETS = [
   './',
@@ -32,10 +32,14 @@ const LOCAL_ASSETS = [
   './assets/animals/leon.png',
   './assets/animals/rana.png',
   './assets/animals/perro.png',
-  './assets/card-backs/skin-red.png',
-  './assets/card-backs/skin-green.png',
-  './assets/card-backs/skin-blue.png',
-  './assets/card-backs/skin-gold.png',
+  './assets/card-backs/skin-galaxy.png?v=2',
+  './assets/card-backs/skin-arcane.png?v=2',
+  './assets/card-backs/skin-forest.png?v=2',
+  './assets/card-backs/skin-storm.png?v=2',
+  './assets/card-backs/skin-royal.png?v=2',
+  './assets/card-backs/skin-inferno.png?v=2',
+  './assets/card-backs/skin-radiant.png?v=2',
+  './assets/card-backs/skin-tech.png?v=2',
   './assets/sounds/rival-found.mp3'
 ];
 

@@ -14,8 +14,8 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=74';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=78';
+} from './database.js?v=75';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=88';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=71';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
@@ -40,7 +40,7 @@ function isOnlineDuelActive(){
 }
 
 function getCurrentPlayerIndex(room = activeOnlineRoom){
-  return room?.players?.findIndex(player => player.uid === session.currentUser?.uid) ?? -1;
+  return listFromFirebase(room?.players).findIndex(player => player.uid === session.currentUser?.uid);
 }
 
 function getOnlinePlayerProfile(){
@@ -53,7 +53,13 @@ function getOnlinePlayerProfile(){
 
 function listFromFirebase(value){
   if(Array.isArray(value)) return value;
-  if(value && typeof value === 'object') return Object.values(value);
+  if(value && typeof value === 'object'){
+    return Object.entries(value)
+      .map(([key, item], index) => item && typeof item === 'object'
+        ? { ...item, uid:item.uid || key, seat:Number(item.seat ?? index) }
+        : item)
+      .sort((a, b) => Number(a?.seat ?? 99) - Number(b?.seat ?? 99));
+  }
   return [];
 }
 
@@ -132,13 +138,36 @@ async function settleOnlineEconomy(room){
     economyRewards
   });
 
-  const winnerProfile = await applyOnlineResult(winner.uid, { saldoDelta:pot, trophiesDelta:winnerCups, awardType, cupType });
-  const loserProfile = await applyOnlineResult(loser.uid, { trophiesDelta:-loserCups, awardType, cupType });
-
-  appliedOnlineEconomyRoomId = freshRoom.id;
-  if(session.currentUser?.uid === winner.uid) syncCurrentUserEconomy(winnerProfile);
-  if(session.currentUser?.uid === loser.uid) syncCurrentUserEconomy(loserProfile);
   return economyRewards;
+}
+
+async function applyOnlineEconomyForCurrentUser(room){
+  if(!room?.economySettled || !room.economyRewards || appliedOnlineEconomyRoomId === room.id) return;
+  const uid = session.currentUser?.uid;
+  if(!uid || isGuestUser()) return;
+
+  const rewards = room.economyRewards;
+  const awardType = rewards.awardType || (rewards.cupType === 'gold' ? 'cup' : 'medal');
+  const cupType = rewards.cupType || (awardType === 'cup' ? 'gold' : 'silver');
+  let result = null;
+
+  if(rewards.winnerUid === uid){
+    result = await applyOnlineResult(uid, {
+      saldoDelta:Number(rewards.pot || room.pot || 0),
+      trophiesDelta:Number(rewards.winnerCups || 0),
+      awardType,
+      cupType
+    });
+  }else if(rewards.loserUid === uid){
+    result = await applyOnlineResult(uid, {
+      trophiesDelta:-Number(rewards.loserCups || 0),
+      awardType,
+      cupType
+    });
+  }
+
+  appliedOnlineEconomyRoomId = room.id;
+  if(result) syncCurrentUserEconomy(result);
 }
 
 function resetOnlineClientToLobby(message = 'Partida online terminada. Puedes buscar otra partida.'){
@@ -402,23 +431,7 @@ function applyOnlineRoom(room){
   gameState.onlineWager = Number(room.wager || gameState.onlineWager || 0);
   gameState.onlinePot = Number(room.pot || (gameState.onlineWager * Math.max(1, listFromFirebase(room.players).length)) || 0);
   if(room.economySettled && room.economyRewards && appliedOnlineEconomyRoomId !== room.id){
-    const rewards = room.economyRewards;
-    const awardKey = (rewards.awardType === 'cup' || rewards.cupType === 'gold') ? 'cups' : 'medals';
-    if(rewards.winnerUid === session.currentUser?.uid){
-      gameState.saldo += Number(rewards.pot || 0);
-      session[awardKey] = Number(session[awardKey] || 0) + Number(rewards.winnerCups || 0);
-    }else if(rewards.loserUid === session.currentUser?.uid){
-      session[awardKey] = Math.max(0, Number(session[awardKey] || 0) - Number(rewards.loserCups || 0));
-    }
-    session.trophies = Number(session.cups || 0) + Number(session.medals || 0);
-    if(session.currentUser){
-      session.currentUser.saldo = gameState.saldo;
-      session.currentUser.trophies = session.trophies;
-      session.currentUser.cups = session.cups;
-      session.currentUser.medals = session.medals;
-    }
-    appliedOnlineEconomyRoomId = room.id;
-    renderUserStats(session.currentUser || session);
+    applyOnlineEconomyForCurrentUser(room).catch(() => {});
   }
   if(previousStatus === 'waiting' && ['ready', 'preview', 'playing'].includes(room.status)){
     playRivalFound();
@@ -1416,6 +1429,7 @@ export async function endGame(){
     updateGuestStats({ pares: gameState.matched, net });
   }else{
     await addLiveHistory({
+      uid: session.currentUser.uid,
       user: session.currentUser.nickname,
       pares: gameState.matched,
       intentos: gameState.intentos,

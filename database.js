@@ -1,7 +1,52 @@
-import { ref, get, set, update, push, onValue, query, limitToLast, remove } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+import { ref, get, set, update, push, onValue, query, limitToLast, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 import { db } from './firebase-config.js?v=71';
 import { INITIAL_SALDO, avatarPool } from './constants.js?v=71';
 import { normalizeNickname } from './utils.js?v=71';
+
+function now(){
+  return Date.now();
+}
+
+function fallbackAvatar(avatar){
+  return avatar || avatarPool[Math.floor(Math.random() * avatarPool.length)];
+}
+
+function listFromFirebase(value){
+  if(Array.isArray(value)) return value;
+  if(value && typeof value === 'object'){
+    return Object.entries(value)
+      .map(([key, item], index) => item && typeof item === 'object'
+        ? { ...item, uid:item.uid || key, seat:Number(item.seat ?? index) }
+        : item)
+      .sort((a, b) => Number(a?.seat ?? 99) - Number(b?.seat ?? 99));
+  }
+  return [];
+}
+
+function playersToMap(players){
+  if(!players) return {};
+  if(Array.isArray(players)){
+    return players.reduce((acc, player, index) => {
+      if(player?.uid) acc[player.uid] = { ...player, seat:Number(player.seat ?? index) };
+      return acc;
+    }, {});
+  }
+  if(typeof players === 'object'){
+    return Object.entries(players).reduce((acc, [uid, player], index) => {
+      if(player && typeof player === 'object'){
+        const playerUid = player.uid || uid;
+        acc[playerUid] = { ...player, uid:playerUid, seat:Number(player.seat ?? index) };
+      }
+      return acc;
+    }, {});
+  }
+  return {};
+}
+
+function normalizeRoomPatch(patch){
+  if(!patch || !Object.prototype.hasOwnProperty.call(patch, 'players')) return patch;
+  return { ...patch, players:playersToMap(patch.players) };
+}
 
 export async function getNicknameOwner(cleanNick){
   const snap = await get(ref(db, `nicknames/${cleanNick}`));
@@ -11,17 +56,18 @@ export async function getNicknameOwner(cleanNick){
 export async function nicknameTaken(cleanNick, uid = null){
   const owner = await getNicknameOwner(cleanNick);
   if(!owner) return false;
-  // Si el nickname ya esta reservado por el mismo usuario, no lo tratamos como ocupado.
-  // Esto evita el falso error despues de crear una cuenta mientras Firebase termina de sincronizar.
   return uid ? owner !== uid : true;
 }
 
 export async function reserveNickname(cleanNick, uid){
-  const owner = await getNicknameOwner(cleanNick);
-  if(owner && owner !== uid){
-    throw new Error('Ese nickname ya está ocupado.');
+  const nickRef = ref(db, `nicknames/${cleanNick}`);
+  const result = await runTransaction(nickRef, current => {
+    if(current && current !== uid) return;
+    return uid;
+  }, { applyLocally:false });
+  if(!result.committed || result.snapshot.val() !== uid){
+    throw new Error('Ese nickname ya esta ocupado.');
   }
-  await set(ref(db, `nicknames/${cleanNick}`), uid);
 }
 
 export async function releaseNickname(cleanNick){
@@ -51,15 +97,24 @@ export async function createUserProfile(uid, { nickname, email }){
     medals: 0,
     silverCups: 0,
     goldCups: 0,
-    createdAt: Date.now(),
-    updatedAt: Date.now()
+    createdAt: now(),
+    updatedAt: now()
   };
   await set(ref(db, `users/${uid}`), profile);
   return profile;
 }
 
 export async function updateSaldo(uid, saldo){
-  await update(ref(db, `users/${uid}`), { saldo, updatedAt: Date.now() });
+  await update(ref(db, `users/${uid}`), { saldo, updatedAt: now() });
+}
+
+async function updatePublicAvatar(uid, avatar){
+  const paths = [`ranking/${uid}`, `rankingMedals/${uid}`, `rankingCups/${uid}`];
+  await Promise.all(paths.map(async path => {
+    const nodeRef = ref(db, path);
+    const snap = await get(nodeRef);
+    if(snap.exists()) await update(nodeRef, { avatar, t:now() });
+  }));
 }
 
 export async function applyOnlineResult(uid, { saldoDelta = 0, trophiesDelta = 0, awardType = '', cupType = 'silver' } = {}){
@@ -75,24 +130,39 @@ export async function applyOnlineResult(uid, { saldoDelta = 0, trophiesDelta = 0
     saldo,
     [awardField]: nextAwards,
     [legacyField]: nextAwards,
-    updatedAt: Date.now()
+    updatedAt: now()
   };
   await update(ref(db, `users/${uid}`), patch);
-  return { ...profile, ...patch };
+
+  const nextProfile = { ...profile, ...patch };
+  const rankingRef = ref(db, `${isCup ? 'rankingCups' : 'rankingMedals'}/${uid}`);
+  if(nextAwards > 0){
+    await set(rankingRef, {
+      uid,
+      user: nextProfile.nickname || nextProfile.email || 'Jugador',
+      avatar: nextProfile.avatar || '',
+      cups: nextAwards,
+      t: now()
+    });
+  }else{
+    await remove(rankingRef);
+  }
+  return nextProfile;
 }
 
 export async function updateUserAvatar(uid, avatar){
-  await update(ref(db, `users/${uid}`), { avatar, updatedAt: Date.now() });
+  await update(ref(db, `users/${uid}`), { avatar, updatedAt: now() });
+  await updatePublicAvatar(uid, avatar).catch(() => {});
 }
 
 export async function updateUserCardSkins(uid, ownedCardSkins, selectedCardSkin){
-  await update(ref(db, `users/${uid}`), { ownedCardSkins, selectedCardSkin, updatedAt: Date.now() });
+  await update(ref(db, `users/${uid}`), { ownedCardSkins, selectedCardSkin, updatedAt: now() });
 }
 
 export async function resetOnlineStats(uid){
   await update(ref(db, `users/${uid}`), {
     saldo: INITIAL_SALDO,
-    updatedAt: Date.now()
+    updatedAt: now()
   });
 }
 
@@ -103,25 +173,39 @@ export async function updateUserStats(uid, { pares, net, saldo }){
   const best = Math.max(Number(profile.best || 0), pares);
   const profit = Number(profile.profit || 0) + net;
 
-  const patch = { games, totalPairs, best, profit, saldo, updatedAt: Date.now() };
+  const patch = { games, totalPairs, best, profit, saldo, updatedAt: now() };
   await update(ref(db, `users/${uid}`), patch);
   return { ...profile, ...patch };
 }
 
-export async function addLiveHistory({ user, pares, intentos, net, avatar }){
-  await push(ref(db, 'liveHistory'), {
+export async function addLiveHistory({ uid, user, pares, intentos, net, avatar }){
+  await push(ref(db, 'historial'), {
+    uid,
     user,
     pares,
     intentos,
     net,
-    t: Date.now(),
-    avatar: avatar || avatarPool[Math.floor(Math.random() * avatarPool.length)]
+    t: now(),
+    avatar: fallbackAvatar(avatar)
   });
 }
 
-
 export async function addLeaderboardEntry({ uid, user, tiempoMs, intentos, pares, premio, avatar }){
-  await push(ref(db, 'leaderboard'), {
+  const entryRef = ref(db, `ranking/${uid}`);
+  const snap = await get(entryRef);
+  const current = snap.exists() ? snap.val() : null;
+  const nextPairs = Number(pares || 0);
+  const nextTime = Number(tiempoMs || Infinity);
+  const nextTries = Number(intentos || Infinity);
+  const isBetter = !current
+    || nextPairs > Number(current.pares || 0)
+    || (nextPairs === Number(current.pares || 0)
+      && (nextTime < Number(current.tiempoMs || Infinity)
+        || (nextTime === Number(current.tiempoMs || Infinity)
+          && nextTries < Number(current.intentos || Infinity))));
+
+  if(!isBetter) return;
+  await set(entryRef, {
     uid,
     user,
     tiempoMs,
@@ -129,16 +213,16 @@ export async function addLeaderboardEntry({ uid, user, tiempoMs, intentos, pares
     intentos,
     pares,
     premio,
-    t: Date.now(),
-    avatar: avatar || avatarPool[Math.floor(Math.random() * avatarPool.length)]
+    t: now(),
+    avatar: fallbackAvatar(avatar)
   });
 }
 
 export function listenLeaderboard(callback){
   const state = { solo: [], silver: [], gold: [] };
   const emit = () => callback({ ...state });
-  const soloQuery = query(ref(db, 'leaderboard'), limitToLast(80));
-  const stopSolo = onValue(soloQuery, snapshot => {
+
+  const stopSolo = onValue(query(ref(db, 'ranking'), limitToLast(80)), snapshot => {
     const data = snapshot.val();
     state.solo = data ? Object.values(data)
       .filter(item => Number(item.pares || 0) >= 8)
@@ -152,42 +236,39 @@ export function listenLeaderboard(callback){
       .slice(0, 10) : [];
     emit();
   });
-  const stopUsers = onValue(ref(db, 'users'), snapshot => {
+
+  const stopMedals = onValue(ref(db, 'rankingMedals'), snapshot => {
     const data = snapshot.val();
-    const users = data ? Object.entries(data).map(([uid, profile]) => ({ uid, ...profile })) : [];
-    const cupRanking = (field, fallbackField) => users
-      .map(profile => ({
-        uid:profile.uid,
-        user:profile.nickname || profile.email || 'Jugador',
-        avatar:profile.avatar,
-        cups:Number(profile[field] ?? profile[fallbackField] ?? 0)
-      }))
-      .filter(item => item.cups > 0)
-      .sort((a,b) => b.cups - a.cups || String(a.user).localeCompare(String(b.user)))
-      .slice(0, 10);
-    state.silver = cupRanking('medals', 'silverCups');
-    state.gold = cupRanking('cups', 'goldCups');
+    state.silver = data ? Object.values(data)
+      .filter(item => Number(item.cups || 0) > 0)
+      .sort((a,b) => Number(b.cups || 0) - Number(a.cups || 0) || String(a.user).localeCompare(String(b.user)))
+      .slice(0, 10) : [];
     emit();
   });
+
+  const stopCups = onValue(ref(db, 'rankingCups'), snapshot => {
+    const data = snapshot.val();
+    state.gold = data ? Object.values(data)
+      .filter(item => Number(item.cups || 0) > 0)
+      .sort((a,b) => Number(b.cups || 0) - Number(a.cups || 0) || String(a.user).localeCompare(String(b.user)))
+      .slice(0, 10) : [];
+    emit();
+  });
+
   return () => {
     stopSolo();
-    stopUsers();
+    stopMedals();
+    stopCups();
   };
 }
 
 export function listenLiveHistory(callback){
-  const q = query(ref(db, 'liveHistory'), limitToLast(12));
+  const q = query(ref(db, 'historial'), limitToLast(12));
   return onValue(q, snapshot => {
     const data = snapshot.val();
     const history = data ? Object.values(data).sort((a,b)=>(b.t||0)-(a.t||0)) : [];
     callback(history);
   });
-}
-
-function listFromFirebase(value){
-  if(Array.isArray(value)) return value;
-  if(value && typeof value === 'object') return Object.values(value);
-  return [];
 }
 
 export async function findWaitingOnlineRoom(mode, uid, wager = 0){
@@ -215,7 +296,9 @@ export async function createOnlineRoom(mode, player, wager = 0){
     pot: entry,
     economySettled: false,
     status: 'waiting',
-    players: [{ ...player, score:0, wager:entry }],
+    players: {
+      [player.uid]: { ...player, score:0, wager:entry, seat:0 }
+    },
     current: 0,
     cards: [],
     flipped: [],
@@ -229,8 +312,8 @@ export async function createOnlineRoom(mode, player, wager = 0){
     matchOver: false,
     statusText: 'Esperando rival online...',
     hostUid: player.uid,
-    createdAt: Date.now(),
-    updatedAt: Date.now()
+    createdAt: now(),
+    updatedAt: now()
   };
   await set(roomRef, room);
   return room;
@@ -247,15 +330,17 @@ export async function joinOnlineRoom(roomId, player, wager = 0){
   const players = listFromFirebase(room.players);
   if(players.some(item => item.uid === player.uid)) return { id: roomId, ...room };
   if(players.length >= 2) throw new Error('La sala esta llena.');
-  const nextPlayers = [...players, { ...player, score:0, wager:entry }];
+
+  const nextPlayers = [...players, { ...player, score:0, wager:entry, seat:players.length }];
+  const nextPlayersMap = playersToMap(nextPlayers);
   await update(roomRef, {
-    players: nextPlayers,
+    players: nextPlayersMap,
     pot: entry * nextPlayers.length,
     status: 'ready',
     statusText: 'Rival encontrado. Preparando partida...',
-    updatedAt: Date.now()
+    updatedAt: now()
   });
-  return { id: roomId, ...room, players: nextPlayers, wager:entry, pot:entry * nextPlayers.length, status:'ready' };
+  return { id: roomId, ...room, players: nextPlayersMap, wager:entry, pot:entry * nextPlayers.length, status:'ready' };
 }
 
 export function listenOnlineRoom(roomId, callback){
@@ -270,7 +355,7 @@ export async function getOnlineRoom(roomId){
 }
 
 export async function updateOnlineRoom(roomId, patch){
-  await update(ref(db, `onlineRooms/${roomId}`), { ...patch, updatedAt: Date.now() });
+  await update(ref(db, `onlineRooms/${roomId}`), { ...normalizeRoomPatch(patch), updatedAt: now() });
 }
 
 export async function removeOnlineRoom(roomId){

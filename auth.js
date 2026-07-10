@@ -19,7 +19,7 @@ import {
   getUserProfile,
   createUserProfile,
   makeUniqueNickname
-} from './database.js?v=74';
+} from './database.js?v=75';
 import {
   setAuthModeUI,
   showAuthModal,
@@ -33,7 +33,7 @@ import {
   showRulesModalIfNeeded,
   resetAvatarDisplay,
   resetCardSkinDisplay
-} from './ui.js?v=78';
+} from './ui.js?v=88';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -320,7 +320,7 @@ export async function handleAuthSubmit(){
     if(nickError){ showAuthError(nickError); return; }
 
     const cleanNick = normalizeNickname(nickname);
-    if(await nicknameTaken(cleanNick)){
+    if(false && await nicknameTaken(cleanNick)){
       showAuthError('Ese nickname ya está ocupado. La originalidad humana vuelve a estar bajo prueba.');
       return;
     }
@@ -328,6 +328,7 @@ export async function handleAuthSubmit(){
     session.registering = true;
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     const uid = cred.user.uid;
+    await cred.user.getIdToken(true).catch(() => {});
     let reserved = false;
 
     try{
@@ -347,6 +348,12 @@ export async function handleAuthSubmit(){
     }catch(dbError){
       if(reserved) await releaseNickname(cleanNick).catch(() => {});
       await deleteUser(cred.user).catch(() => {});
+      if(String(dbError?.message || '').toLowerCase().includes('nickname')){
+        throw new Error('Ese nickname ya esta ocupado. Elige otro e intenta crear la cuenta nuevamente.');
+      }
+      if(dbError?.code === 'PERMISSION_DENIED' || String(dbError?.message || '').toLowerCase().includes('permission')){
+        throw new Error('Firebase rechazo guardar el perfil. Revisa que hayas pegado las reglas nuevas de Realtime Database.');
+      }
       throw new Error('La cuenta se creó, pero falló el perfil. Se limpió automáticamente. Intenta nuevamente.');
     }
   }catch(error){

@@ -350,16 +350,18 @@ body::before{
 .skin-preview{height:178px;display:grid;place-items:center;border-radius:7px;background:rgba(0,0,0,.42);overflow:hidden;padding:10px}
 .skin-art{
   height:100%;
-  width:149px;
+  width:158px;
   max-width:100%;
-  aspect-ratio:166/176;
+  aspect-ratio:1/1;
   border-radius:7px;
   border:2px solid #ffd36a;
   display:grid;
   place-items:center;
   overflow:hidden;
-  background-size:cover;
+  background-color:#050201;
+  background-size:contain;
   background-position:center;
+  background-repeat:no-repeat;
   box-shadow:0 0 16px rgba(249,199,79,.28), inset 0 0 18px rgba(0,0,0,.32);
 }
 .default-skin-preview{
@@ -646,6 +648,38 @@ body::before{
   display:grid;
   gap:18px;
   justify-items:center;
+}
+.start-auth-actions{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.start-auth-actions[hidden]{
+  display:none;
+}
+.start-auth-button{
+  min-height:48px;
+  padding:10px 12px;
+  border:1px solid rgba(249,199,79,.58);
+  border-radius:10px;
+  background:rgba(0,0,0,.62);
+  color:white;
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:0 0 18px rgba(0,0,0,.25);
+}
+.start-auth-button:hover{
+  background:rgba(249,199,79,.14);
+  border-color:var(--gold);
+}
+.start-auth-button.guest{
+  color:var(--gold);
+}
+.auth-modal-open .start-game-panel,
+body:has(#auth-modal[style*="display: flex"]) .start-game-panel{
+  visibility:hidden;
+  pointer-events:none;
 }
 .start-game-panel.online-searching .start-actions{
   display:none;
@@ -944,12 +978,12 @@ body.online-duel-active .online-waiting-logo{
 }
 .board{display:grid;grid-template-columns:repeat(4, minmax(112px, 150px));gap:16px;justify-content:center;position:relative;align-content:start;min-height:690px}
 .game-round-active .board{
-  --active-card-size:clamp(80px, 13.4vh, 116px);
+  --active-card-size:clamp(88px, 14.4vh, 128px);
   grid-template-columns:repeat(4, var(--active-card-size));
   gap:clamp(7px, 1.35vh, 12px);
   min-height:auto;
 }
-.card-wrap{width:100%;aspect-ratio:166/176;perspective:950px;cursor:pointer;transition:transform .55s cubic-bezier(.2,.8,.2,1);will-change:transform;z-index:1;transform-style:preserve-3d;isolation:isolate}
+.card-wrap{width:100%;aspect-ratio:1/1;perspective:950px;cursor:pointer;transition:transform .55s cubic-bezier(.2,.8,.2,1);will-change:transform;z-index:1;transform-style:preserve-3d;isolation:isolate}
 .card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .50s cubic-bezier(.22,1,.36,1);will-change:transform}
 .card-wrap.flipped .card-inner,.card-wrap.matched .card-inner{transform:rotateY(180deg) translateZ(0)}
 .card-face{position:absolute;inset:0;border-radius:12px;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:grid;place-items:center;border:3px solid #ffd36a;box-shadow:0 0 18px rgba(249,199,79,.55), inset 0 0 20px rgba(0,0,0,.32);user-select:none;transform-style:preserve-3d}
@@ -958,8 +992,22 @@ body.online-duel-active .online-waiting-logo{
   background:var(--card-back-skin);
   background-size:cover;
   background-position:center;
+  overflow:hidden;
 }
 .card-back::before{content:''}
+.card-back.has-skin{
+  background:#050201;
+}
+.card-back-img{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:fill;
+  border-radius:8px;
+  transform:translateZ(0);
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
 .card-front{transform:rotateY(180deg) translateZ(1px);background:#050201;overflow:hidden;padding:0}
 .animal-card-img{width:100%;height:100%;object-fit:contain;display:block;border-radius:8px;background:#050201}
 .card-wrap.matched .card-front{background:linear-gradient(145deg,#09aa38,#1cff6d);color:white;border-color:#b8ffc8;box-shadow:0 0 24px rgba(53,244,107,.9)}
@@ -1344,7 +1392,7 @@ body.online-duel-active #btn-exit{
     scroll-snap-align:center;
   }
   .skin-preview{height:210px}
-  .skin-art{width:179px}
+  .skin-art{width:190px}
   .profile-card{gap:12px}
   .profile-avatar-large{width:72px;height:72px}
   .profile-card h2{font-size:23px}
@@ -1706,5 +1754,41 @@ body.online-duel-active #btn-exit{
   background:white;
   border-color:white;
   color:#202124;
+}
+
+.auth-back-button{
+  position:fixed;
+  top:24px;
+  left:24px;
+  z-index:100000;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  min-height:44px;
+  margin:0;
+  padding:11px 18px;
+  border:1px solid rgba(249,199,79,.58);
+  border-radius:999px;
+  background:rgba(255,255,255,.07);
+  color:var(--gold);
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:0 0 22px rgba(0,0,0,.28);
+  backdrop-filter:blur(10px);
+}
+
+.auth-back-button:hover{
+  background:rgba(249,199,79,.12);
+  border-color:var(--gold);
+}
+
+@media(max-width:720px){
+  .auth-back-button{
+    top:calc(14px + env(safe-area-inset-top));
+    left:calc(14px + env(safe-area-inset-left));
+    min-height:42px;
+    padding:10px 15px;
+    font-size:14px;
+  }
 }
 

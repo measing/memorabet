@@ -1,9 +1,18 @@
-import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings } from './auth.js?v=74';
-import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=77';
-import { listenLiveHistory, listenLeaderboard } from './database.js?v=74';
+import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings } from './auth.js?v=78';
+import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=79';
+import { listenLiveHistory, listenLeaderboard } from './database.js?v=75';
 import { session } from './state.js?v=72';
-import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=78';
+import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=88';
 import { initAudioControls } from './audio.js?v=71';
+
+window.__memorabetMainLoaded = true;
+
+function openAuth(mode = 'choice'){
+  setAuthMode(mode);
+  const modal = document.getElementById('auth-modal');
+  document.body.classList.add('auth-modal-open');
+  if(modal) modal.style.display = 'flex';
+}
 
 function initMobileAppSupport(){
   const setAppHeight = () => {
@@ -37,6 +46,7 @@ function registerServiceWorker(){
 function bindEvents(){
   document.getElementById('tab-login')?.addEventListener('click', () => setAuthMode('login'));
   document.getElementById('tab-register')?.addEventListener('click', () => setAuthMode('register'));
+  document.getElementById('auth-back')?.addEventListener('click', () => setAuthMode('choice'));
   document.getElementById('auth-submit')?.addEventListener('click', handleAuthSubmit);
   document.getElementById('btn-guest')?.addEventListener('click', enterGuestMode);
   document.getElementById('auth-password')?.addEventListener('keydown', e => {
@@ -46,7 +56,13 @@ function bindEvents(){
     if(e.key === 'Enter') handleAuthSubmit();
   });
   document.getElementById('btn-change-user')?.addEventListener('click', openSettingsPanel);
-  document.getElementById('btn-start-center')?.addEventListener('click', startSelectedGame);
+  document.getElementById('btn-start-center')?.addEventListener('click', () => {
+    if(!session.currentUser) openAuth('choice');
+    else startSelectedGame();
+  });
+  document.getElementById('btn-start-login')?.addEventListener('click', () => openAuth('login'));
+  document.getElementById('btn-start-register')?.addEventListener('click', () => openAuth('register'));
+  document.getElementById('btn-start-guest')?.addEventListener('click', enterGuestMode);
   document.getElementById('btn-mode-picker')?.addEventListener('click', toggleGameModePanel);
   document.getElementById('mode-close-button')?.addEventListener('click', closeGameModePanel);
   document.getElementById('game-mode-panel')?.addEventListener('click', event => {
