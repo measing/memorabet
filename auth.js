@@ -34,7 +34,7 @@ import {
   showRulesModalIfNeeded,
   resetAvatarDisplay,
   resetCardSkinDisplay
-} from './ui.js?v=92';
+} from './ui.js?v=93';
 import { t } from './i18n.js?v=1';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';

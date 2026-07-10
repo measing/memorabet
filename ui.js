@@ -5,7 +5,7 @@ import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.j
 import { t } from './i18n.js?v=1';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
-const AVATARS = Array.from({ length: 36 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
+const AVATARS = Array.from({ length: 37 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
 const DEFAULT_AVATAR = AVATARS[0];
 const CARD_SKIN_OWNED_KEY = 'memorabetOwnedCardSkins';
 const CARD_SKIN_SELECTED_KEY = 'memorabetSelectedCardSkin';

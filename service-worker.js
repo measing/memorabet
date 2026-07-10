@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-web-v103';
+const CACHE_NAME = 'memorabet-web-v104';
 
 const LOCAL_ASSETS = [
   './',
@@ -48,7 +48,7 @@ const LOCAL_ASSETS = [
   './assets/sounds/casino-vip-1.mp3'
 ];
 
-const avatarAssets = Array.from({ length: 36 }, (_, index) => {
+const avatarAssets = Array.from({ length: 37 }, (_, index) => {
   const number = String(index + 1).padStart(2, '0');
   return `./assets/avatars/avatar-${number}.png`;
 });
