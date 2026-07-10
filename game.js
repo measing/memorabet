@@ -759,7 +759,7 @@ async function handleOnlineCardClick(id){
 
     const first = flipped[0];
     const second = flipped[1];
-    setTimeout(() => resolveOnlinePair(room.id, first, second).catch(() => {}), 760);
+    setTimeout(() => resolveOnlinePair(room.id, first, second).catch(() => {}), 430);
   }finally{
     onlineClickPending = false;
   }
@@ -1004,15 +1004,15 @@ async function animateVisibleSwap(a, b, speed = 1, token = gameState.gameToken){
   elA.style.zIndex = '50';
   elB.style.zIndex = '51';
 
-  await wait(35 * speed);
+  await wait(22 * speed);
   if(token !== gameState.gameToken) return false;
 
-  elA.style.transition = `transform ${0.72 * speed}s cubic-bezier(.18,.86,.24,1)`;
-  elB.style.transition = `transform ${0.72 * speed}s cubic-bezier(.18,.86,.24,1)`;
+  elA.style.transition = `transform ${0.46 * speed}s cubic-bezier(.18,.86,.24,1)`;
+  elB.style.transition = `transform ${0.46 * speed}s cubic-bezier(.18,.86,.24,1)`;
   elA.style.transform = 'translate(0, 0) scale(1)';
   elB.style.transform = 'translate(0, 0) scale(1)';
 
-  await wait(760 * speed);
+  await wait(490 * speed);
   if(token !== gameState.gameToken) return false;
 
   elA.style.transition = '';
@@ -1046,7 +1046,7 @@ async function animateShuffle(speed = 1, resetMatched = true, token = gameState.
       const tmp = gameState.cards[a];
       gameState.cards[a] = gameState.cards[b];
       gameState.cards[b] = tmp;
-      await wait(80 * speed);
+      await wait(35 * speed);
     }
 
     if(token !== gameState.gameToken) return false;
@@ -1157,7 +1157,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   gameState.cards.forEach(c => c.flipped = false);
   updateCardClasses();
 
-  await wait(650);
+  await wait(360);
   if(token !== gameState.gameToken){
     gameState.starting = false;
     gameState.blocked = false;
@@ -1169,7 +1169,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   }else{
     if(localDuel) hideMsg();
     else showMsg('Mezclando cartas... sigue el movimiento con la vista.', 'warning');
-    const shuffled = await animateShuffle(1, true, token);
+    const shuffled = await animateShuffle(.58, true, token);
     if(!shuffled || token !== gameState.gameToken){
       gameState.starting = false;
       gameState.blocked = false;
@@ -1180,7 +1180,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   }
 
   renderBoard(flipCard);
-  await wait(250);
+  await wait(140);
   if(token !== gameState.gameToken){
     gameState.starting = false;
     gameState.blocked = false;
@@ -1344,7 +1344,7 @@ export function flipCard(id){
         }
         else if(isLocalDuelActive()) hideMsg();
         else showMsg(`Par encontrado. +${formatMoney(G)}.`, 'success');
-      }, 520);
+      }, 310);
     }else{
       playMiss();
       const wA = document.querySelector(`.card-wrap[data-id="${gameState.flipped[0]}"]`);
@@ -1376,7 +1376,7 @@ export function flipCard(id){
           hideMsg();
         }else if(gameState.intentos >= K_MAX) endGame();
         else showMsg(`Sin par. Intentos restantes: ${K_MAX - gameState.intentos}.`, 'warning');
-      }, 820);
+      }, 430);
     }
   }
 }
