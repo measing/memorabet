@@ -2,6 +2,7 @@ import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
 import { gameState, session } from './state.js?v=72';
 import { escapeHTML, formatMoney } from './utils.js?v=71';
 import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=77';
+import { t } from './i18n.js?v=1';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
 const AVATARS = Array.from({ length: 36 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
@@ -10,15 +11,15 @@ const CARD_SKIN_OWNED_KEY = 'memorabetOwnedCardSkins';
 const CARD_SKIN_SELECTED_KEY = 'memorabetSelectedCardSkin';
 const DEFAULT_CARD_SKIN_ID = 'default';
 const CARD_SKINS = [
-  { id:DEFAULT_CARD_SKIN_ID, name:'Predeterminado', price:0, src:'', default:true },
-  { id:'galaxy', name:'Galaxia dorada', price:15000, src:'assets/card-backs/skin-galaxy.png?v=2' },
-  { id:'arcane', name:'Runas moradas', price:15000, src:'assets/card-backs/skin-arcane.png?v=2' },
-  { id:'forest', name:'Bosque esmeralda', price:15000, src:'assets/card-backs/skin-forest.png?v=2' },
-  { id:'storm', name:'Tormenta azul', price:15000, src:'assets/card-backs/skin-storm.png?v=2' },
-  { id:'royal', name:'Corona negra', price:15000, src:'assets/card-backs/skin-royal.png?v=2' },
-  { id:'inferno', name:'Fuego infernal', price:15000, src:'assets/card-backs/skin-inferno.png?v=2' },
-  { id:'radiant', name:'Luz radiante', price:15000, src:'assets/card-backs/skin-radiant.png?v=2' },
-  { id:'tech', name:'Esmeralda tech', price:15000, src:'assets/card-backs/skin-tech.png?v=2' }
+  { id:DEFAULT_CARD_SKIN_ID, nameKey:'store.default', price:0, src:'', default:true },
+  { id:'galaxy', nameKey:'store.galaxy', price:15000, src:'assets/card-backs/skin-galaxy.png?v=2' },
+  { id:'arcane', nameKey:'store.arcane', price:15000, src:'assets/card-backs/skin-arcane.png?v=2' },
+  { id:'forest', nameKey:'store.forest', price:15000, src:'assets/card-backs/skin-forest.png?v=2' },
+  { id:'storm', nameKey:'store.storm', price:15000, src:'assets/card-backs/skin-storm.png?v=2' },
+  { id:'royal', nameKey:'store.royal', price:15000, src:'assets/card-backs/skin-royal.png?v=2' },
+  { id:'inferno', nameKey:'store.inferno', price:15000, src:'assets/card-backs/skin-inferno.png?v=2' },
+  { id:'radiant', nameKey:'store.radiant', price:15000, src:'assets/card-backs/skin-radiant.png?v=2' },
+  { id:'tech', nameKey:'store.tech', price:15000, src:'assets/card-backs/skin-tech.png?v=2' }
 ];
 let selectedRankingBoard = 'solo';
 
@@ -117,8 +118,9 @@ function renderCardSkinStore(){
   store.innerHTML = CARD_SKINS.map(skin => {
     const isOwned = skin.default || owned.includes(skin.id);
     const isEquipped = selected?.id === skin.id;
-    const action = isEquipped ? 'En uso' : isOwned ? (skin.default ? 'Usar' : 'Equipar') : 'Comprar';
-    const price = skin.default ? 'Gratis' : formatMoney(skin.price);
+    const action = isEquipped ? t('common.equipped') : isOwned ? (skin.default ? t('common.use') : t('common.equip')) : t('common.buy');
+    const price = skin.default ? t('common.free') : formatMoney(skin.price);
+    const name = t(skin.nameKey);
     return `
       <article class="shop-item skin-card ${isEquipped ? 'equipped' : ''}" data-skin-id="${skin.id}">
         <div class="skin-preview">
@@ -127,7 +129,7 @@ function renderCardSkinStore(){
           </div>
         </div>
         <div class="skin-info">
-          <strong>${escapeHTML(skin.name)}</strong>
+          <strong>${escapeHTML(name)}</strong>
           <span>${price}</span>
         </div>
         <button class="skin-action" type="button" data-skin-action="${skin.id}" ${isEquipped ? 'disabled' : ''}>${action}</button>
@@ -145,17 +147,17 @@ function renderCardSkinStore(){
         await saveCardSkinState(currentOwned, skin.id);
         applySelectedCardSkin();
         renderCardSkinStore();
-        showStoreStatus(`${skin.name} equipado.`, 'success');
+        showStoreStatus(t('store.equipped', { name:t(skin.nameKey) }), 'success');
         return;
       }
 
       if(!session.currentUser || isGuestUser()){
-        showStoreStatus('Inicia sesión para comprar cartas.', 'warning');
+        showStoreStatus(t('store.login'), 'warning');
         return;
       }
 
       if(gameState.saldo < skin.price){
-        showStoreStatus(`Saldo insuficiente. Necesitas ${formatMoney(skin.price)}.`, 'danger');
+        showStoreStatus(t('store.noMoney', { price:formatMoney(skin.price) }), 'danger');
         return;
       }
 
@@ -166,7 +168,7 @@ function renderCardSkinStore(){
       updateStats();
       applySelectedCardSkin();
       renderCardSkinStore();
-      showStoreStatus(`${skin.name} comprada y equipada.`, 'success');
+      showStoreStatus(t('store.bought', { name:t(skin.nameKey) }), 'success');
     });
   });
 }
@@ -180,7 +182,7 @@ function renderEntryAvatar(avatar, label){
 }
 
 function getEntryName(item){
-  return item?.user || item?.name || item?.nickname || item?.winnerName || 'Jugador';
+  return item?.user || item?.name || item?.nickname || item?.winnerName || t('common.player');
 }
 
 export function setAuthModeUI(mode){
@@ -201,8 +203,8 @@ export function setAuthModeUI(mode){
   const loginTab = document.getElementById('tab-login');
   const registerTab = document.getElementById('tab-register');
   const backButton = document.getElementById('auth-back');
-  if(loginTab) loginTab.textContent = isChoice ? 'Iniciar sesion' : 'Ingresar';
-  if(registerTab) registerTab.textContent = 'Crear cuenta';
+  if(loginTab) loginTab.textContent = isChoice ? t('auth.loginShort') : t('auth.login');
+  if(registerTab) registerTab.textContent = t('auth.register');
   if(backButton) backButton.style.display = isChoice ? 'none' : 'inline-flex';
 
   const email = document.getElementById('auth-email');
@@ -213,15 +215,15 @@ export function setAuthModeUI(mode){
   if(pass) pass.style.display = (isChoice || isRepair) ? 'none' : 'block';
   if(nick){
     nick.style.display = (isRegister || isRepair) ? 'block' : 'none';
-    if(isRepair) nick.placeholder = 'Elige tu nickname definitivo';
-    else nick.placeholder = 'Nickname único';
+    if(isRepair) nick.placeholder = t('auth.nicknameFinal');
+    else nick.placeholder = t('auth.nickname');
   }
 
   const submit = document.getElementById('auth-submit');
   if(submit){
     submit.style.display = isChoice ? 'none' : 'flex';
-    if(isRepair) submit.textContent = 'Guardar nickname';
-    else submit.textContent = isRegister ? 'Crear cuenta' : 'Ingresar';
+    if(isRepair) submit.textContent = t('auth.saveNickname');
+    else submit.textContent = isRegister ? t('auth.register') : t('auth.login');
   }
 
   const guest = document.getElementById('btn-guest');
@@ -344,8 +346,8 @@ export function updateStats(){
   if(onlineWaiting) onlineWaiting.hidden = !onlineSearching;
   if(onlineWaitingText){
     onlineWaitingText.textContent = onlineStatus === 'ready'
-      ? 'Rival encontrado'
-      : 'Buscando rival online...';
+      ? t('online.found')
+      : t('online.searching');
   }
 
   if(roundNumber){
@@ -367,20 +369,20 @@ export function updateStats(){
       const [p1, p2] = duel.players;
       duelPlayer1?.classList.toggle('active', gameState.localDuel.current === 0);
       duelPlayer2?.classList.toggle('active', gameState.localDuel.current === 1);
-      if(duelName1) duelName1.textContent = p1?.name || 'Jugador 1';
-      if(duelName2) duelName2.textContent = p2?.name || 'Jugador 2';
+      if(duelName1) duelName1.textContent = p1?.name || `${t('common.player')} 1`;
+      if(duelName2) duelName2.textContent = p2?.name || `${t('common.player')} 2`;
       if(duelAvatar1) duelAvatar1.style.backgroundImage = p1?.avatar ? `url("${p1.avatar}")` : '';
       if(duelAvatar2) duelAvatar2.style.backgroundImage = p2?.avatar ? `url("${p2.avatar}")` : '';
       if(duelScore1) duelScore1.textContent = p1?.score ?? 0;
       if(duelScore2) duelScore2.textContent = p2?.score ?? 0;
       if(duelTurn){
         const wins = Array.isArray(duel.roundWins) ? duel.roundWins : [0, 0];
-        const activePlayer = duel.players[duel.current] || duel.players[0] || { name:'Jugador 1' };
+        const activePlayer = duel.players[duel.current] || duel.players[0] || { name:`${t('common.player')} 1` };
         const baseTurn = duel.suddenDeath
-          ? `Muerte subita: turno de ${activePlayer.name}`
-          : `Turno de ${activePlayer.name}`;
+          ? t('duel.suddenTurn', { name:activePlayer.name })
+          : t('duel.turn', { name:activePlayer.name });
         const turnText = duel.statusText || (roundActive
-          ? (duel.mode === 'memory' ? `${baseTurn} · Primero a 8 pares` : `${baseTurn} · Rondas ${wins[0]}-${wins[1]}`)
+          ? (duel.mode === 'memory' ? `${baseTurn} · ${t('duel.firstToEight')}` : `${baseTurn} · ${t('duel.rounds', { a:wins[0], b:wins[1] })}`)
           : '');
         duelTurn.textContent = turnText;
         duelTurn.hidden = !turnText;
@@ -391,27 +393,27 @@ export function updateStats(){
     ganancia.textContent = formatMoney(gameState.saldo);
     ganancia.className = gameState.saldo >= C ? 'success' : 'danger';
   }
-  if(profileBalance) profileBalance.textContent = localDuel ? (onlineDuel ? 'Modo online' : 'Modo offline') : formatMoney(gameState.saldo);
+  if(profileBalance) profileBalance.textContent = localDuel ? (onlineDuel ? t('mode.online') : t('mode.offline')) : formatMoney(gameState.saldo);
 
   const newBtn = document.getElementById('btn-new');
   if(newBtn && !newBtn.disabled){
     if(localDuel){
-      if(duel.matchOver) newBtn.textContent = '▶ Nueva partida';
+      if(duel.matchOver) newBtn.textContent = t('button.newGame');
       else if(!gameState.playing && !gameState.starting && gameState.cards.length){
-        newBtn.textContent = duel.mode === 'memory' ? '▶ Nueva partida' : (duel.suddenDeath ? '▶ Muerte subita' : `▶ Ronda ${duel.round || 1}`);
-      }else newBtn.textContent = '▶ Nueva partida';
-    }else newBtn.textContent = '▶ Nueva partida';
+        newBtn.textContent = duel.mode === 'memory' ? t('button.newGame') : (duel.suddenDeath ? t('button.suddenDeath') : t('button.round', { round:duel.round || 1 }));
+      }else newBtn.textContent = t('button.newGame');
+    }else newBtn.textContent = t('button.newGame');
   }
 }
 
 export function renderUser(profile){
   if(!profile) return;
-  document.getElementById('player-name').textContent = profile.nickname || 'Jugador';
+  document.getElementById('player-name').textContent = profile.nickname || t('common.player');
   session.cups = Number(profile.cups ?? profile.goldCups ?? 0);
   session.medals = Number(profile.medals ?? profile.silverCups ?? 0);
   session.trophies = Number(profile.trophies ?? (session.cups + session.medals) ?? 0);
   const profileName = document.getElementById('profile-name');
-  if(profileName) profileName.textContent = profile.nickname || 'Jugador';
+  if(profileName) profileName.textContent = profile.nickname || t('common.player');
   const profileAvatar = AVATARS.includes(profile.avatar) ? profile.avatar : getSelectedAvatar();
   if(session.currentUser) session.currentUser.avatar = profileAvatar;
   localStorage.setItem(getAvatarStorageKey(), profileAvatar);
@@ -455,7 +457,7 @@ export function renderUserStats(stats = {}){
 }
 
 
-export function setNewGameButtonBusy(isBusy, text = 'Preparando partida...'){
+export function setNewGameButtonBusy(isBusy, text = t('common.loading')){
   const buttons = [
     document.getElementById('btn-start-center'),
     document.getElementById('btn-new')
@@ -463,7 +465,7 @@ export function setNewGameButtonBusy(isBusy, text = 'Preparando partida...'){
   buttons.forEach(btn => {
     btn.disabled = !!isBusy;
     btn.classList.toggle('btn-disabled', !!isBusy);
-    btn.textContent = isBusy ? text : (btn.id === 'btn-start-center' ? 'Comenzar juego' : '▶ Nueva partida');
+    btn.textContent = isBusy ? text : (btn.id === 'btn-start-center' ? t('button.start') : t('button.newGame'));
   });
   const picker = document.getElementById('btn-mode-picker');
   if(picker){
@@ -490,21 +492,21 @@ export function showVictoryAnimation({ tiempoMs, intentos, premio }){
     <div class="confetti-layer">${Array.from({ length: 42 }, (_, i) => `<span style="--i:${i}">★</span>`).join('')}</div>
     <div class="victory-box">
       <div class="victory-trophy">🏆</div>
-      <h2>¡Felicidades!</h2>
-      <p>Encontraste los 8 pares.</p>
-      <div class="victory-prize">Premio ficticio: ${formatMoney(premio)}</div>
+      <h2>${escapeHTML(t('victory.title'))}</h2>
+      <p>${escapeHTML(t('victory.found'))}</p>
+      <div class="victory-prize">${escapeHTML(t('victory.fakePrize', { prize:formatMoney(premio) }))}</div>
       <div class="victory-details">
-        <span>Tiempo: <strong>${formatDuration(tiempoMs)}</strong></span>
-        <span>Intentos: <strong>${intentos}</strong></span>
+        <span>${escapeHTML(t('victory.time'))}: <strong>${formatDuration(tiempoMs)}</strong></span>
+        <span>${escapeHTML(t('victory.tries'))}: <strong>${intentos}</strong></span>
       </div>
-      <button class="btn btn-green" id="victory-close">Cerrar</button>
+      <button class="btn btn-green" id="victory-close">${escapeHTML(t('common.close'))}</button>
     </div>`;
   document.body.appendChild(overlay);
   document.getElementById('victory-close')?.addEventListener('click', () => overlay.remove());
   setTimeout(() => overlay.classList.add('show'), 20);
 }
 
-export function showOnlineVictoryAnimation({ winnerName = 'Jugador', reason = 'Partida online terminada.', pot = 0, cupText = '', autoCloseMs = 3200 } = {}){
+export function showOnlineVictoryAnimation({ winnerName = t('common.player'), reason = t('online.finished'), pot = 0, cupText = '', autoCloseMs = 3200 } = {}){
   const old = document.getElementById('victory-overlay');
   if(old) old.remove();
 
@@ -515,15 +517,15 @@ export function showOnlineVictoryAnimation({ winnerName = 'Jugador', reason = 'P
     <div class="confetti-layer">${Array.from({ length: 42 }, (_, i) => `<span style="--i:${i}">*</span>`).join('')}</div>
     <div class="victory-box">
       <div class="victory-trophy">🏆</div>
-      <h2>Ganador</h2>
+      <h2>${escapeHTML(t('online.winner'))}</h2>
       <p>${escapeHTML(reason)}</p>
       <div class="victory-prize">${escapeHTML(winnerName)}</div>
       <div class="victory-details">
-        ${pot ? `<span>Pozo: <strong>${formatMoney(pot)}</strong></span>` : ''}
-        ${cupText ? `<span>Premio: <strong>${escapeHTML(cupText)}</strong></span>` : ''}
-        <span>Volviendo al lobby...</span>
+        ${pot ? `<span>${escapeHTML(t('online.pot'))}: <strong>${formatMoney(pot)}</strong></span>` : ''}
+        ${cupText ? `<span>${escapeHTML(t('online.prize'))}: <strong>${escapeHTML(cupText)}</strong></span>` : ''}
+        <span>${escapeHTML(t('online.backLobby'))}</span>
       </div>
-      <button class="btn btn-green" id="victory-close">Buscar partida</button>
+      <button class="btn btn-green" id="victory-close">${escapeHTML(t('online.findGame'))}</button>
     </div>`;
   document.body.appendChild(overlay);
   document.getElementById('victory-close')?.addEventListener('click', () => overlay.remove());
@@ -541,14 +543,14 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
   };
 
   const renderSolo = items => {
-    if(!items.length) return '<p class="empty">Aun nadie completa los 8 pares.</p>';
+    if(!items.length) return `<p class="empty">${escapeHTML(t('ranking.emptySolo'))}</p>`;
     return items.map((item, idx) => {
       const isCurrent = session.currentUser && item.uid === session.currentUser.uid;
       return `<div class="ranking-item">
         <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, getEntryName(item))}</div>
         <div>
           <div class="ranking-name ${isCurrent ? 'current':''}">#${idx + 1} ${escapeHTML(getEntryName(item))}</div>
-          <div class="ranking-meta">${formatDuration(Number(item.tiempoMs || 0))} &middot; ${Number(item.intentos || 0)} intentos</div>
+          <div class="ranking-meta">${formatDuration(Number(item.tiempoMs || 0))} &middot; ${escapeHTML(t('ranking.tries', { count:Number(item.intentos || 0) }))}</div>
         </div>
         <div class="ranking-prize">${formatMoney(Number(item.premio || 10000))}</div>
       </div>`;
@@ -557,8 +559,8 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
 
   const renderCups = (items, type) => {
     const isGold = type === 'gold';
-    const label = isGold ? 'Copa dorada' : 'Medalla';
-    const empty = isGold ? 'Aun no hay copas en este modo.' : 'Aun no hay medallas en este modo.';
+    const label = isGold ? t('ranking.goldenCup') : t('ranking.medal');
+    const empty = isGold ? t('ranking.emptyCups') : t('ranking.emptyMedals');
     const icon = isGold ? '&#127942;' : '&#127941;';
     if(!items.length) return `<p class="empty">${empty}</p>`;
     return items.map((item, idx) => {
@@ -577,20 +579,20 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
 
   const views = {
     solo:{
-      title:'Solo: 8 pares acertados',
-      label:'Solo',
+      title:t('ranking.soloTitle'),
+      label:t('ranking.solo'),
       body:renderSolo(boards.solo)
     },
     silver:{
-      title:'Duelo de Pares',
-      label:'Pares',
-      badge:'Medallas',
+      title:t('ranking.pairsTitle'),
+      label:t('ranking.pairs'),
+      badge:t('ranking.medals'),
       body:renderCups(boards.silver, 'silver')
     },
     gold:{
-      title:'Duelo de Memoria',
-      label:'Memoria',
-      badge:'Copas doradas',
+      title:t('ranking.memoryTitle'),
+      label:t('ranking.memory'),
+      badge:t('ranking.goldenCups'),
       body:renderCups(boards.gold, 'gold')
     }
   };
@@ -598,7 +600,7 @@ export function renderLeaderboard(ranking = session.cachedLeaderboard){
   const current = views[selectedRankingBoard];
 
   list.innerHTML = `
-    <div class="ranking-switcher" role="tablist" aria-label="Ranking de juego">
+    <div class="ranking-switcher" role="tablist" aria-label="${escapeHTML(t('ranking.game'))}">
       ${Object.entries(views).map(([key, view]) => `
         <button class="ranking-switch ${key === selectedRankingBoard ? 'active' : ''}" type="button" data-ranking-board="${key}" role="tab" aria-selected="${key === selectedRankingBoard}">
           ${escapeHTML(view.label)}
@@ -623,7 +625,7 @@ function renderLeaderboardLegacy(ranking = session.cachedLeaderboard){
   const list = document.getElementById('leaderboard-list');
   if(!list) return;
   if(!ranking.length){
-    list.innerHTML = '<p class="empty">Aún nadie completa los 8 pares.</p>';
+    list.innerHTML = `<p class="empty">${escapeHTML(t('ranking.emptySolo'))}</p>`;
     return;
   }
 
@@ -634,7 +636,7 @@ function renderLeaderboardLegacy(ranking = session.cachedLeaderboard){
       <div class="entry-avatar ranking-avatar">${renderEntryAvatar(item.avatar, getEntryName(item))}</div>
       <div>
         <div class="ranking-name ${isCurrent ? 'current':''}">${medal} ${escapeHTML(getEntryName(item))}</div>
-        <div class="ranking-meta">${formatDuration(Number(item.tiempoMs || 0))} · ${Number(item.intentos || 0)} intentos</div>
+        <div class="ranking-meta">${formatDuration(Number(item.tiempoMs || 0))} · ${escapeHTML(t('ranking.tries', { count:Number(item.intentos || 0) }))}</div>
       </div>
       <div class="ranking-prize">${formatMoney(Number(item.premio || 10000))}</div>
     </div>`;
@@ -645,7 +647,7 @@ export function renderLiveHistoryList(history = session.cachedLiveHistory){
   const list = document.getElementById('live-history-list');
   if(!list) return;
   if(!history.length){
-    list.innerHTML = '<p class="empty">Sin partidas registradas.</p>';
+    list.innerHTML = `<p class="empty">${escapeHTML(t('history.empty'))}</p>`;
     return;
   }
 
@@ -653,7 +655,7 @@ export function renderLiveHistoryList(history = session.cachedLiveHistory){
     const name = getEntryName(item);
     const isCurrent = session.currentUser && name === session.currentUser.nickname;
     const secs = Math.max(0, Math.floor((Date.now() - (item.t || Date.now()))/1000));
-    const when = secs < 8 ? 'Ahora mismo' : `Hace ${secs} seg`;
+    const when = secs < 8 ? t('common.now') : t('common.secondsAgo', { seconds:secs });
     return `<div class="live-item">
       <div class="entry-avatar live-avatar">${renderEntryAvatar(item.avatar, name)}</div>
       <div><div class="live-name ${isCurrent ? 'current':''}">${escapeHTML(name)}</div><div class="live-time">${when}</div></div>
@@ -709,7 +711,7 @@ export function initProfileAvatars(){
         if(session.currentUser){
           session.currentUser.avatar = avatar;
           if(!isGuestUser()) await updateUserAvatar(session.currentUser.uid, avatar).catch(() => {
-            showMsg('No se pudo guardar el avatar en línea, pero quedó aplicado en este navegador.', 'warning');
+            showMsg(t('msg.avatarSaveFailed'), 'warning');
           });
         }
         applySelectedAvatar(avatar);

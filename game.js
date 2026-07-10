@@ -15,8 +15,9 @@ import {
   updateOnlineRoom,
   removeOnlineRoom
 } from './database.js?v=77';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=91';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=92';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
+import { t } from './i18n.js?v=1';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -170,7 +171,7 @@ async function applyOnlineEconomyForCurrentUser(room){
   if(result) syncCurrentUserEconomy(result);
 }
 
-function resetOnlineClientToLobby(message = 'Partida online terminada. Puedes buscar otra partida.'){
+function resetOnlineClientToLobby(message = t('online.finished')){
   gameState.gameToken++;
   gameState.playing = false;
   gameState.blocked = false;
@@ -214,10 +215,10 @@ function confirmOnlineExit(){
     overlay.className = 'online-exit-confirm';
     overlay.innerHTML = `
       <div class="online-exit-box">
-        <h2>Salir de la partida</h2>
-        <p>Si sales ahora, el otro jugador gana automaticamente y pierdes la entrada.</p>
-        <button class="btn btn-red" id="confirm-online-exit" type="button">Salir y dar victoria</button>
-        <button class="btn btn-blue" id="cancel-online-exit" type="button">Cancelar</button>
+        <h2>${t('exit.title')}</h2>
+        <p>${t('exit.body')}</p>
+        <button class="btn btn-red" id="confirm-online-exit" type="button">${t('exit.confirm')}</button>
+        <button class="btn btn-blue" id="cancel-online-exit" type="button">${t('exit.cancel')}</button>
       </div>`;
 
     const close = value => {
@@ -423,7 +424,7 @@ function applyOnlineRoom(room){
     lastOnlineRoomStatus = null;
     clearBoard();
     updateStats();
-    showMsg('La sala online se cerrÃ³.', 'warning');
+    showMsg(t('online.closed'), 'warning');
     return;
   }
 
@@ -444,7 +445,7 @@ function applyOnlineRoom(room){
   if(room.status === 'finished' && room.economySettled && handledOnlineFinishId !== room.id){
     handledOnlineFinishId = room.id;
     const winner = getOnlineWinner(room);
-    const winnerName = winner.name || 'Jugador';
+    const winnerName = winner.name || t('common.player');
     const rewards = room.economyRewards || {};
     const isWinner = rewards.winnerUid === session.currentUser?.uid;
     const isLoser = rewards.loserUid === session.currentUser?.uid;
@@ -452,12 +453,12 @@ function applyOnlineRoom(room){
     const awardLabel = (rewards.awardType === 'cup' || rewards.cupType === 'gold') ? 'Copas' : 'Medallas';
     showOnlineVictoryAnimation({
       winnerName,
-      reason: room.concededBy ? `${winnerName} gana por abandono.` : `${winnerName} gana la partida online.`,
+      reason: room.concededBy ? t('online.winsLeave', { name:winnerName }) : t('online.winsGame', { name:winnerName }),
       pot:Number(rewards.pot || room.pot || 0),
       cupText:cupText ? `${awardLabel} ${cupText}` : '',
       autoCloseMs: 3200
     });
-    setTimeout(() => resetOnlineClientToLobby('Volviste al lobby online. Puedes buscar otra partida.'), 3300);
+    setTimeout(() => resetOnlineClientToLobby(t('online.lobby')), 3300);
   }
   if(room.status !== 'playing' || room.resolving) onlineClickPending = false;
   gameState.localDuel.active = true;
@@ -506,9 +507,9 @@ function applyOnlineRoom(room){
   }
   updateStats();
 
-  if(room.status === 'waiting') showMsg('Sala creada. Esperando rival online...', 'info');
-  else if(room.status === 'ready') showMsg('Rival encontrado. Preparando partida...', 'success');
-  else if(room.status === 'preview') showMsg('Memoricen las cartas. La partida empieza en unos segundos.', 'info');
+  if(room.status === 'waiting') showMsg(t('online.waiting'), 'info');
+  else if(room.status === 'ready') showMsg(t('online.ready'), 'success');
+  else if(room.status === 'preview') showMsg(t('online.preview'), 'info');
   else if(room.status === 'finished') hideMsg();
   else hideMsg();
 
@@ -759,7 +760,7 @@ async function handleOnlineCardClick(id){
 
     const first = flipped[0];
     const second = flipped[1];
-    setTimeout(() => resolveOnlinePair(room.id, first, second).catch(() => {}), 430);
+    setTimeout(() => resolveOnlinePair(room.id, first, second).catch(() => {}), 760);
   }finally{
     onlineClickPending = false;
   }
@@ -1004,15 +1005,15 @@ async function animateVisibleSwap(a, b, speed = 1, token = gameState.gameToken){
   elA.style.zIndex = '50';
   elB.style.zIndex = '51';
 
-  await wait(22 * speed);
+  await wait(35 * speed);
   if(token !== gameState.gameToken) return false;
 
-  elA.style.transition = `transform ${0.46 * speed}s cubic-bezier(.18,.86,.24,1)`;
-  elB.style.transition = `transform ${0.46 * speed}s cubic-bezier(.18,.86,.24,1)`;
+  elA.style.transition = `transform ${0.66 * speed}s cubic-bezier(.18,.86,.24,1)`;
+  elB.style.transition = `transform ${0.66 * speed}s cubic-bezier(.18,.86,.24,1)`;
   elA.style.transform = 'translate(0, 0) scale(1)';
   elB.style.transform = 'translate(0, 0) scale(1)';
 
-  await wait(490 * speed);
+  await wait(700 * speed);
   if(token !== gameState.gameToken) return false;
 
   elA.style.transition = '';
@@ -1046,7 +1047,7 @@ async function animateShuffle(speed = 1, resetMatched = true, token = gameState.
       const tmp = gameState.cards[a];
       gameState.cards[a] = gameState.cards[b];
       gameState.cards[b] = tmp;
-      await wait(35 * speed);
+      await wait(65 * speed);
     }
 
     if(token !== gameState.gameToken) return false;
@@ -1066,7 +1067,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   // Bloqueamos solo mientras se prepara la partida, para evitar doble clics reales.
   // Si ya hay una partida en curso, Nueva partida cancela esa ronda y comienza otra limpia.
   if(gameState.starting){
-    showMsg('Ya se está preparando una partida. Espera un momento.', 'warning');
+    showMsg(t('msg.preparing'), 'warning');
     return;
   }
 
@@ -1108,7 +1109,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   if(!localDuel && gameState.saldo < C){
     gameState.starting = false;
     setNewGameButtonBusy(false);
-    showMsg('No tienes saldo suficiente. Reinicia el juego.', 'danger');
+    showMsg(t('msg.noBalance'), 'danger');
     return;
   }
 
@@ -1143,7 +1144,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   renderBoard(flipCard);
   updateStats();
   if(localDuel) hideMsg();
-  else showMsg('Memoriza las cartas. Tendrás unos segundos antes del mezclado visible.', 'info');
+  else showMsg(t('msg.memorize'), 'info');
 
   await wait(5000);
   if(token !== gameState.gameToken){
@@ -1153,11 +1154,11 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
     return;
   }
   if(localDuel) hideMsg();
-  else showMsg('Cartas ocultándose...', 'warning');
+  else showMsg(t('msg.hiding'), 'warning');
   gameState.cards.forEach(c => c.flipped = false);
   updateCardClasses();
 
-  await wait(360);
+  await wait(650);
   if(token !== gameState.gameToken){
     gameState.starting = false;
     gameState.blocked = false;
@@ -1168,8 +1169,8 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
     gameState.localDuel.statusText = `Turno de ${currentLocalPlayer().name}`;
   }else{
     if(localDuel) hideMsg();
-    else showMsg('Mezclando cartas... sigue el movimiento con la vista.', 'warning');
-    const shuffled = await animateShuffle(.58, true, token);
+    else showMsg(t('msg.shuffling'), 'warning');
+    const shuffled = await animateShuffle(.9, true, token);
     if(!shuffled || token !== gameState.gameToken){
       gameState.starting = false;
       gameState.blocked = false;
@@ -1180,7 +1181,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   }
 
   renderBoard(flipCard);
-  await wait(140);
+  await wait(250);
   if(token !== gameState.gameToken){
     gameState.starting = false;
     gameState.blocked = false;
@@ -1196,7 +1197,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   renderBoard(flipCard);
   updateStats();
   if(localDuel) hideMsg();
-  else showMsg('Ahora sí: juega. Si seguiste el movimiento, deberías tener opciones reales.', 'success');
+  else showMsg(t('msg.play'), 'success');
 }
 
 export async function newGame(){
@@ -1213,14 +1214,14 @@ export async function newMemoryDuel(){
 
 export async function startOnlineGame(mode = 'classic'){
   if(!session.currentUser || isGuestUser()){
-    showMsg('Para jugar online necesitas iniciar sesion o crear una cuenta.', 'warning');
+    showMsg(t('msg.onlineLogin'), 'warning');
     const authModal = document.getElementById('auth-modal');
     if(authModal) authModal.style.display = 'flex';
     return;
   }
   const wager = normalizeOnlineWager(selectedOnlineWager);
   if(gameState.saldo < wager){
-    showMsg(`No tienes saldo suficiente para la entrada de ${formatMoney(wager)}.`, 'danger');
+    showMsg(t('msg.noWagerBalance', { amount:formatMoney(wager) }), 'danger');
     return;
   }
 
@@ -1244,13 +1245,13 @@ export async function startOnlineGame(mode = 'classic'){
   gameState.localDuel.mode = mode === 'memory' ? 'memory' : 'classic';
   gameState.localDuel.players = [
     { ...getOnlinePlayerProfile(), score:0 },
-    { name:'Esperando rival', avatar:'', score:0 }
+    { name:t('online.waitingRival'), avatar:'', score:0 }
   ];
-  gameState.localDuel.statusText = `Buscando rival online... Entrada ${formatMoney(wager)}`;
+  gameState.localDuel.statusText = `${t('online.searching')} ${t('mode.wager')} ${formatMoney(wager)}`;
   setNewGameButtonBusy(true);
   clearBoard();
   updateStats();
-  showMsg('Buscando rival online...', 'info');
+  showMsg(t('msg.searchingOnline'), 'info');
 
   try{
     const player = getOnlinePlayerProfile();
@@ -1343,8 +1344,8 @@ export function flipCard(id){
           updateStats();
         }
         else if(isLocalDuelActive()) hideMsg();
-        else showMsg(`Par encontrado. +${formatMoney(G)}.`, 'success');
-      }, 310);
+        else showMsg(t('msg.pairFound', { amount:formatMoney(G) }), 'success');
+      }, 520);
     }else{
       playMiss();
       const wA = document.querySelector(`.card-wrap[data-id="${gameState.flipped[0]}"]`);
@@ -1375,8 +1376,8 @@ export function flipCard(id){
           updateStats();
           hideMsg();
         }else if(gameState.intentos >= K_MAX) endGame();
-        else showMsg(`Sin par. Intentos restantes: ${K_MAX - gameState.intentos}.`, 'warning');
-      }, 430);
+        else showMsg(t('msg.noPair', { count:K_MAX - gameState.intentos }), 'warning');
+      }, 820);
     }
   }
 }
@@ -1406,8 +1407,8 @@ export async function endGame(){
   gameState.round = Math.max(1, Number(gameState.round || 1)) + 1;
 
   if(completed){
-    const guestNote = isGuestUser() ? ' · Crea una cuenta para entrar al ranking.' : '';
-    showMsg(`¡Completaste los 8 pares! Tiempo: ${formatDuration(tiempoMs)} · Intentos: ${gameState.intentos} · Premio ficticio: ${formatMoney(premioRanking)}${guestNote}`, 'success');
+    const guestNote = isGuestUser() ? t('msg.guestRank') : '';
+    showMsg(t('msg.completed', { time:formatDuration(tiempoMs), tries:gameState.intentos, prize:formatMoney(premioRanking), guestNote }), 'success');
     showVictoryAnimation({ tiempoMs, intentos: gameState.intentos, premio: premioRanking });
     if(!isGuestUser()){
       await addLeaderboardEntry({
@@ -1421,7 +1422,12 @@ export async function endGame(){
       });
     }
   }else{
-    showMsg(`Partida terminada. ${gameState.matched}/${TOTAL_PAIRS} · Resultado: ${net >= 0 ? '+' : ''}${formatMoney(net)} · Saldo actual: ${formatMoney(gameState.saldo)}`, type);
+    showMsg(t('msg.finished', {
+      matched:gameState.matched,
+      total:TOTAL_PAIRS,
+      result:`${net >= 0 ? '+' : ''}${formatMoney(net)}`,
+      balance:formatMoney(gameState.saldo)
+    }), type);
   }
 
   if(isGuestUser()){
@@ -1515,7 +1521,7 @@ export async function resetGame(){
   setNewGameButtonBusy(false);
   clearBoard();
   updateStats();
-  showMsg('Juego reiniciado. Presiona Comenzar juego.', 'info');
+  showMsg(t('msg.reset'), 'info');
 }
 
 export async function exitGame(){
@@ -1527,12 +1533,12 @@ export async function exitGame(){
       const ok = await confirmOnlineExit();
       if(!ok) return;
       concedeOnlineRoom().catch(() => {});
-      resetOnlineClientToLobby('Saliste de la partida online. Victoria para el rival.');
+      resetOnlineClientToLobby(t('msg.leftOnlineWin'));
       return;
     }
     await refundPendingOnlineEntry(room);
     await cleanupOnlineRoom({ removeRoom:!hasOpponent, silent:false });
-    resetOnlineClientToLobby('Saliste de la sala online. Puedes buscar otra partida.');
+    resetOnlineClientToLobby(t('msg.leftOnlineRoom'));
     return;
   }
   const shouldRefundEntry = !isLocalDuelActive()
@@ -1566,5 +1572,5 @@ export async function exitGame(){
   clearBoard();
   updateStats();
   document.body.classList.remove('game-round-active', 'game-controls-active', 'local-duel-active');
-  showMsg('Saliste de la partida. Elige modo o comienza otra vez.', 'info');
+  showMsg(t('msg.leftGame'), 'info');
 }

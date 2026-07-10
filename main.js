@@ -1,9 +1,10 @@
-import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=81';
-import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=82';
+import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=82';
+import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=84';
 import { listenLiveHistory, listenLeaderboard } from './database.js?v=77';
 import { session } from './state.js?v=72';
-import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=91';
+import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=92';
 import { initAudioControls } from './audio.js?v=73';
+import { initI18n, translatePage } from './i18n.js?v=1';
 
 window.__memorabetMainLoaded = true;
 
@@ -91,9 +92,18 @@ initProfileAvatars();
 initCardSkinStore();
 initAudioControls();
 initAccountSettings();
+initI18n();
 setAuthMode('choice');
 updateStats();
 listenAuthState();
+
+document.addEventListener('memorabet-language-change', () => {
+  translatePage();
+  setAuthMode(session.authMode || 'choice');
+  updateStats();
+  renderLiveHistoryList();
+  renderLeaderboard();
+});
 
 listenLiveHistory(history => {
   session.cachedLiveHistory = history;
