@@ -178,6 +178,7 @@
     },
 
     "onlineRooms": {
+      ".read": "auth != null",
       "$roomId": {
         ".read": "auth != null",
         ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() === auth.uid && newData.child('players').child(auth.uid).exists()) || (data.exists() && data.child('players').child(auth.uid).exists()) || (newData.exists() && newData.child('players').child(auth.uid).exists()))",

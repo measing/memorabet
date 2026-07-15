@@ -321,7 +321,10 @@
 
   <script>
     (function(){
+      var isLocalFile = window.location.protocol === 'file:';
+
       function showLocalFileHelp(){
+        if(!isLocalFile) return;
         document.body.classList.add('auth-modal-open');
         var modal = document.getElementById('auth-modal');
         var error = document.getElementById('nickname-error');
@@ -338,6 +341,14 @@
 
       function installFallback(){
         if(window.__memorabetMainLoaded) return;
+        if(!isLocalFile){
+          var loadingMsg = document.getElementById('msg');
+          if(loadingMsg){
+            loadingMsg.className = 'message visible warning';
+            loadingMsg.textContent = 'El juego todavia esta cargando. Si no responde, actualiza la pagina con Ctrl+F5.';
+          }
+          return;
+        }
         var msg = document.getElementById('msg');
         if(msg){
           msg.className = 'message visible warning';
@@ -349,9 +360,9 @@
         });
       }
 
-      setTimeout(installFallback, 800);
+      setTimeout(installFallback, isLocalFile ? 800 : 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=105"></script>
+  <script type="module" src="main.js?v=106"></script>
 </body>
 </html>
