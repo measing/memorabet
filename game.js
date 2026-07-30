@@ -15,7 +15,7 @@ import {
   updateOnlineRoom,
   removeOnlineRoom
 } from './database.js?v=77';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=93';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=94';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=1';
 
@@ -30,6 +30,7 @@ let onlineStartTimer = null;
 let onlineClickPending = false;
 let onlineStartShuffleKey = null;
 let lastOnlineRoomStatus = null;
+let lastSuddenDeathNoticeKey = null;
 let handledOnlineFinishId = null;
 let appliedOnlineEconomyRoomId = null;
 
@@ -45,6 +46,15 @@ function isGuestUser(){
 
 function isOnlineDuelActive(){
   return !!gameState.onlineRoom?.id;
+}
+
+function showSuddenDeathNotice(key, subtitle = 'Empate en el mejor de 3. Ahora gana quien resista el fallo.'){
+  if(lastSuddenDeathNoticeKey === key) return;
+  lastSuddenDeathNoticeKey = key;
+  showSuddenDeathBanner({
+    title:'MUERTE SUBITA',
+    subtitle
+  });
 }
 
 function getCurrentPlayerIndex(room = activeOnlineRoom){
@@ -275,6 +285,7 @@ function resetLocalRoundScores(){
 }
 
 function startFreshLocalMatch(mode = 'classic'){
+  lastSuddenDeathNoticeKey = null;
   gameState.localDuel.active = true;
   gameState.localDuel.mode = mode;
   gameState.localDuel.current = 0;
@@ -340,6 +351,7 @@ async function cleanupOnlineRoom({ removeRoom = false, silent = false } = {}){
   clearOnlineTimer();
   onlineClickPending = false;
   onlineStartShuffleKey = null;
+  lastSuddenDeathNoticeKey = null;
   lastOnlineRoomStatus = null;
   if(onlineRoomUnsubscribe){
     onlineRoomUnsubscribe();
@@ -462,6 +474,7 @@ function beginOnlineStartShuffle(room, finalCards){
 
 function applyOnlineRoom(room){
   const previousStatus = lastOnlineRoomStatus;
+  const previousRoom = activeOnlineRoom;
   activeOnlineRoom = room;
   setNewGameButtonBusy(false);
   if(!room){
@@ -481,6 +494,7 @@ function applyOnlineRoom(room){
     gameState.onlineWager = 0;
     gameState.onlinePot = 0;
     lastOnlineRoomStatus = null;
+    lastSuddenDeathNoticeKey = null;
     clearBoard();
     updateStats();
     showMsg(t('online.closed'), 'warning');
@@ -537,6 +551,9 @@ function applyOnlineRoom(room){
   }));
   while(gameState.localDuel.players.length < 2){
     gameState.localDuel.players.push({ name:`Jugador ${gameState.localDuel.players.length + 1}`, avatar:'', score:0 });
+  }
+  if(room.mode === 'classic' && room.suddenDeath && !previousRoom?.suddenDeath){
+    showSuddenDeathNotice(`online-sudden-death:${room.id}`, 'Empate online. Ahora gana quien defienda mejor en muerte subita.');
   }
 
   const roomCards = listFromFirebase(room.cards);
@@ -897,6 +914,7 @@ function completeLocalDuelRound(){
     duel.suddenDeathLead = -1;
     duel.round++;
     duel.statusText = 'Empate: muerte subita';
+    showSuddenDeathNotice('local-duel-sudden-death', 'Empate en el mejor de 3. Presiona Muerte subita para jugar el desempate.');
     return;
   }
 
