@@ -28,9 +28,16 @@ let onlineRoomUnsubscribe = null;
 let activeOnlineRoom = null;
 let onlineStartTimer = null;
 let onlineClickPending = false;
+let onlineStartShuffleKey = null;
 let lastOnlineRoomStatus = null;
 let handledOnlineFinishId = null;
 let appliedOnlineEconomyRoomId = null;
+
+const VISIBLE_SHUFFLE_SWAPS = [
+  [0, 5], [3, 10], [12, 7], [15, 2],
+  [1, 8], [6, 14], [4, 11], [9, 13],
+  [5, 10], [2, 7], [0, 12], [3, 15]
+];
 
 function isGuestUser(){
   return !!session.currentUser?.isGuest;
@@ -302,6 +309,22 @@ function buildOnlineDeck({ flipped = true } = {}){
   }));
 }
 
+function applyVisibleShuffleOrder(cards, { resetMatched = true } = {}){
+  const next = cards.map(card => ({ ...card }));
+  for(const [a, b] of VISIBLE_SHUFFLE_SWAPS){
+    if(!next[a] || !next[b]) continue;
+    const tmp = next[a];
+    next[a] = next[b];
+    next[b] = tmp;
+  }
+  return next.map((card, i) => ({
+    ...card,
+    id:i,
+    flipped:false,
+    matched:resetMatched ? false : card.matched
+  }));
+}
+
 function getOnlineTurnText(room){
   const player = listFromFirebase(room.players)[room.current];
   return room.statusText || (player ? `Turno de ${player.name}` : 'Esperando rival online...');
@@ -316,6 +339,7 @@ async function cleanupOnlineRoom({ removeRoom = false, silent = false } = {}){
   const roomId = activeOnlineRoom?.id || gameState.onlineRoom?.id;
   clearOnlineTimer();
   onlineClickPending = false;
+  onlineStartShuffleKey = null;
   lastOnlineRoomStatus = null;
   if(onlineRoomUnsubscribe){
     onlineRoomUnsubscribe();
@@ -373,7 +397,7 @@ async function startOnlinePlaying(room){
   room = freshRoom;
   let cards = listFromFirebase(room.cards).map(card => ({ ...card, flipped:false, matched:false }));
   if(room.mode === 'classic'){
-    cards = shuffle(cards).map((card, i) => ({ ...card, id:i }));
+    cards = applyVisibleShuffleOrder(cards);
   }
   const players = listFromFirebase(room.players).slice(0, 2).map(player => ({ ...player, score:0 }));
   await updateOnlineRoom(room.id, {
@@ -402,6 +426,40 @@ function scheduleOnlineHostStep(room){
   }
 }
 
+function beginOnlineStartShuffle(room, finalCards){
+  const key = `${room.id}:${room.startedAt || room.updatedAt || 'playing'}`;
+  if(onlineStartShuffleKey === key) return true;
+  onlineStartShuffleKey = key;
+
+  const token = gameState.gameToken;
+  gameState.cards = gameState.cards.map(card => ({
+    ...card,
+    flipped:false,
+    matched:false
+  }));
+  gameState.flipped = [];
+  gameState.matched = 0;
+  gameState.intentos = 0;
+  gameState.starting = true;
+  gameState.playing = false;
+  gameState.blocked = true;
+  gameState.localDuel.statusText = t('msg.shuffling');
+  setNewGameButtonBusy(true);
+  updateCardClasses();
+  updateStats();
+
+  (async () => {
+    await wait(650);
+    if(token !== gameState.gameToken || activeOnlineRoom?.id !== room.id) return;
+    const shuffled = await animateShuffle(.9, true, token);
+    if(!shuffled || token !== gameState.gameToken || activeOnlineRoom?.id !== room.id) return;
+    gameState.cards = finalCards;
+    applyOnlineRoom(room);
+  })();
+
+  return true;
+}
+
 function applyOnlineRoom(room){
   const previousStatus = lastOnlineRoomStatus;
   activeOnlineRoom = room;
@@ -413,6 +471,7 @@ function applyOnlineRoom(room){
     activeOnlineRoom = null;
     gameState.onlineRoom = null;
     gameState.localDuel = createLocalDuelState();
+    onlineStartShuffleKey = null;
     gameState.playing = false;
     gameState.blocked = false;
     gameState.starting = false;
@@ -480,7 +539,18 @@ function applyOnlineRoom(room){
     gameState.localDuel.players.push({ name:`Jugador ${gameState.localDuel.players.length + 1}`, avatar:'', score:0 });
   }
 
-  gameState.cards = listFromFirebase(room.cards);
+  const roomCards = listFromFirebase(room.cards);
+  const shouldAnimateOnlineClassicShuffle = previousStatus === 'preview'
+    && room.status === 'playing'
+    && room.mode === 'classic'
+    && gameState.cards.length === roomCards.length
+    && roomCards.length > 0;
+  if(shouldAnimateOnlineClassicShuffle && beginOnlineStartShuffle(room, roomCards)){
+    scheduleOnlineHostStep(room);
+    return;
+  }
+
+  gameState.cards = roomCards;
   gameState.flipped = listFromFirebase(room.flipped);
   gameState.matched = Number(room.matched || 0);
   gameState.intentos = Number(room.intentos || 0);
@@ -1032,14 +1102,8 @@ async function animateShuffle(speed = 1, resetMatched = true, token = gameState.
 
   // Barajado visible: son pocos intercambios, lentos y reales.
   // El jugador puede seguir algunas cartas con la vista, no como casino turbio de caricatura.
-  const visibleSwaps = [
-    [0, 5], [3, 10], [12, 7], [15, 2],
-    [1, 8], [6, 14], [4, 11], [9, 13],
-    [5, 10], [2, 7], [0, 12], [3, 15]
-  ];
-
   try{
-    for(const [a, b] of visibleSwaps){
+    for(const [a, b] of VISIBLE_SHUFFLE_SWAPS){
       if(token !== gameState.gameToken) return false;
       const moved = await animateVisibleSwap(a, b, speed, token);
       if(!moved || token !== gameState.gameToken) return false;
@@ -1168,8 +1232,13 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   if(localDuel && localDuelMode === 'memory'){
     gameState.localDuel.statusText = `Turno de ${currentLocalPlayer().name}`;
   }else{
-    if(localDuel) hideMsg();
-    else showMsg(t('msg.shuffling'), 'warning');
+    if(localDuel){
+      gameState.localDuel.statusText = t('msg.shuffling');
+      updateStats();
+      hideMsg();
+    }else{
+      showMsg(t('msg.shuffling'), 'warning');
+    }
     const shuffled = await animateShuffle(.9, true, token);
     if(!shuffled || token !== gameState.gameToken){
       gameState.starting = false;
@@ -1195,6 +1264,9 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   gameState.startTime = Date.now();
   setNewGameButtonBusy(false);
   renderBoard(flipCard);
+  if(localDuel && gameState.localDuel.statusText === t('msg.shuffling')){
+    gameState.localDuel.statusText = '';
+  }
   updateStats();
   if(localDuel) hideMsg();
   else showMsg(t('msg.play'), 'success');
