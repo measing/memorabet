@@ -539,7 +539,8 @@ export function showOnlineVictoryAnimation({ winnerName = t('common.player'), re
 export function showSuddenDeathBanner({
   title = 'MUERTE SUBITA',
   subtitle = 'Empate en el mejor de 3. Ahora gana quien resista el fallo.',
-  autoCloseMs = 2600
+  autoCloseMs = 2600,
+  imageSrc = 'assets/sudden-death.png'
 } = {}){
   const old = document.getElementById('sudden-death-banner');
   if(old) old.remove();
@@ -549,18 +550,23 @@ export function showSuddenDeathBanner({
   banner.className = 'sudden-death-banner';
   banner.innerHTML = `
     <div class="sudden-death-box">
+      <img class="sudden-death-image" src="${escapeHTML(imageSrc)}" alt="${escapeHTML(title)}" />
       <span>DESEMPATE</span>
       <h2>${escapeHTML(title)}</h2>
       <p>${escapeHTML(subtitle)}</p>
     </div>`;
   document.body.appendChild(banner);
   setTimeout(() => banner.classList.add('show'), 20);
-  if(autoCloseMs > 0){
-    setTimeout(() => {
+  return new Promise(resolve => {
+    const close = () => {
       banner.classList.remove('show');
-      setTimeout(() => banner.remove(), 240);
-    }, autoCloseMs);
-  }
+      setTimeout(() => {
+        banner.remove();
+        resolve();
+      }, 240);
+    };
+    if(autoCloseMs > 0) setTimeout(close, autoCloseMs);
+  });
 }
 
 export function renderLeaderboard(ranking = session.cachedLeaderboard){

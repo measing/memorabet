@@ -15,7 +15,7 @@ import {
   updateOnlineRoom,
   removeOnlineRoom
 } from './database.js?v=77';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=94';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=95';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=1';
 
@@ -51,9 +51,10 @@ function isOnlineDuelActive(){
 function showSuddenDeathNotice(key, subtitle = 'Empate en el mejor de 3. Ahora gana quien resista el fallo.'){
   if(lastSuddenDeathNoticeKey === key) return;
   lastSuddenDeathNoticeKey = key;
-  showSuddenDeathBanner({
+  return showSuddenDeathBanner({
     title:'MUERTE SUBITA',
-    subtitle
+    subtitle,
+    autoCloseMs:2300
   });
 }
 
@@ -914,7 +915,6 @@ function completeLocalDuelRound(){
     duel.suddenDeathLead = -1;
     duel.round++;
     duel.statusText = 'Empate: muerte subita';
-    showSuddenDeathNotice('local-duel-sudden-death', 'Empate en el mejor de 3. Presiona Muerte subita para jugar el desempate.');
     return;
   }
 
@@ -1160,6 +1160,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   gameState.flipped = [];
   gameState.startTime = 0;
   gameState.endTime = 0;
+  const token = gameState.gameToken;
   if(localDuel){
     const preserveDuelMatch = gameState.localDuel.active
       && gameState.localDuel.mode === localDuelMode
@@ -1182,6 +1183,22 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   }
   setNewGameButtonBusy(true);
 
+  if(localDuel && localDuelMode === 'classic' && gameState.localDuel.suddenDeath){
+    gameState.blocked = true;
+    gameState.localDuel.statusText = 'Muerte subita';
+    updateStats();
+    await showSuddenDeathNotice(
+      `local-sudden-round:${gameState.localDuel.round}:${gameState.localDuel.suddenDeathStep}`,
+      'Muerte subita activada. Memoriza las cartas y defiende tu turno.'
+    );
+    if(token !== gameState.gameToken){
+      gameState.starting = false;
+      gameState.blocked = false;
+      setNewGameButtonBusy(false);
+      return;
+    }
+  }
+
   if(!localDuel && !session.currentUser){
     gameState.starting = false;
     setNewGameButtonBusy(false);
@@ -1195,7 +1212,6 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
     return;
   }
 
-  const token = gameState.gameToken;
   const deck = shuffle([...ANIMAL_CARDS, ...ANIMAL_CARDS]);
   gameState.playing = false;
   gameState.cards = deck.map((animal,i)=>({
