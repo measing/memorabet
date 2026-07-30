@@ -1,5 +1,5 @@
 import { ANIMAL_CARDS, K_MAX, TOTAL_PAIRS, G, C, ONLINE_WAGERS, ONLINE_WIN_CUPS, ONLINE_LOSE_CUPS } from './constants.js?v=72';
-import { createLocalDuelState, gameState, session } from './state.js?v=72';
+import { createLocalDuelState, gameState, session } from './state.js?v=73';
 import { shuffle, wait, formatMoney } from './utils.js?v=71';
 import {
   updateSaldo,
@@ -7,6 +7,7 @@ import {
   addLiveHistory,
   updateUserStats,
   addLeaderboardEntry,
+  getUserProfile,
   findWaitingOnlineRoom,
   createOnlineRoom,
   joinOnlineRoom,
@@ -14,10 +15,11 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=77';
+} from './database.js?v=78';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=95';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=1';
+import { cancelSoloGameServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=1';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -127,37 +129,7 @@ function getOnlineWinner(room){
 async function settleOnlineEconomy(room){
   const freshRoom = await getOnlineRoom(room.id);
   if(!freshRoom || freshRoom.economySettled || freshRoom.status !== 'finished') return null;
-
-  const winner = getOnlineWinner(freshRoom);
-  const players = listFromFirebase(freshRoom.players).slice(0, 2);
-  const loser = players.find(player => player.uid && player.uid !== winner.uid);
-  if(!winner?.uid || !loser?.uid) return null;
-
-  const wager = normalizeOnlineWager(freshRoom.wager);
-  const pot = Number(freshRoom.pot || wager * players.length || wager * 2);
-  const winnerCups = randomInt(ONLINE_WIN_CUPS.min, ONLINE_WIN_CUPS.max);
-  const loserCups = randomInt(ONLINE_LOSE_CUPS.min, ONLINE_LOSE_CUPS.max);
-  const awardType = freshRoom.mode === 'memory' ? 'cup' : 'medal';
-  const cupType = awardType === 'cup' ? 'gold' : 'silver';
-  const economyRewards = {
-    pot,
-    wager,
-    awardType,
-    cupType,
-    winnerUid:winner.uid,
-    winnerName:winner.name || freshRoom.winnerName || 'Jugador',
-    winnerCups,
-    loserUid:loser.uid,
-    loserName:loser.name || 'Jugador',
-    loserCups
-  };
-
-  await updateOnlineRoom(freshRoom.id, {
-    economySettled:true,
-    economyRewards
-  });
-
-  return economyRewards;
+  return settleOnlineRoomServer(freshRoom.id);
 }
 
 async function applyOnlineEconomyForCurrentUser(room){
@@ -165,28 +137,9 @@ async function applyOnlineEconomyForCurrentUser(room){
   const uid = session.currentUser?.uid;
   if(!uid || isGuestUser()) return;
 
-  const rewards = room.economyRewards;
-  const awardType = rewards.awardType || (rewards.cupType === 'gold' ? 'cup' : 'medal');
-  const cupType = rewards.cupType || (awardType === 'cup' ? 'gold' : 'silver');
-  let result = null;
-
-  if(rewards.winnerUid === uid){
-    result = await applyOnlineResult(uid, {
-      saldoDelta:Number(rewards.pot || room.pot || 0),
-      trophiesDelta:Number(rewards.winnerCups || 0),
-      awardType,
-      cupType
-    });
-  }else if(rewards.loserUid === uid){
-    result = await applyOnlineResult(uid, {
-      trophiesDelta:-Number(rewards.loserCups || 0),
-      awardType,
-      cupType
-    });
-  }
-
   appliedOnlineEconomyRoomId = room.id;
-  if(result) syncCurrentUserEconomy(result);
+  const freshProfile = await getUserProfile(uid);
+  if(freshProfile) syncCurrentUserEconomy(freshProfile);
 }
 
 function resetOnlineClientToLobby(message = t('online.finished')){
@@ -200,6 +153,7 @@ function resetOnlineClientToLobby(message = t('online.finished')){
   gameState.intentos = 0;
   gameState.round = 1;
   gameState.gananciaPartida = 0;
+  gameState.soloSessionId = null;
   gameState.onlineWager = 0;
   gameState.onlinePot = 0;
   gameState.startTime = 0;
@@ -1226,11 +1180,25 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   gameState.matched = 0;
   gameState.intentos = 0;
   gameState.gananciaPartida = localDuel ? 0 : -C;
+  gameState.soloSessionId = null;
   gameState.blocked = true;
   if(!localDuel){
-    gameState.saldo -= C;
-    if(isGuestUser()) saveGuestBalance();
-    else await updateSaldo(session.currentUser.uid, gameState.saldo);
+    if(isGuestUser()){
+      gameState.saldo -= C;
+      saveGuestBalance();
+    }else{
+      try{
+        const started = await startSoloGameServer();
+        gameState.soloSessionId = started.sessionId || null;
+        gameState.saldo = Number(started.saldo ?? (gameState.saldo - C));
+      }catch(error){
+        gameState.starting = false;
+        gameState.blocked = false;
+        setNewGameButtonBusy(false);
+        showMsg(error?.message || 'No se pudo iniciar la partida segura.', 'danger');
+        return;
+      }
+    }
   }
   if(token !== gameState.gameToken){
     gameState.starting = false;
@@ -1421,7 +1389,6 @@ export function flipCard(id){
           gameState.gananciaPartida += G;
           gameState.saldo += G;
           if(isGuestUser()) saveGuestBalance();
-          else await updateSaldo(session.currentUser.uid, gameState.saldo);
         }
         gameState.flipped = [];
         gameState.blocked = false;
@@ -1516,17 +1483,6 @@ export async function endGame(){
     const guestNote = isGuestUser() ? t('msg.guestRank') : '';
     showMsg(t('msg.completed', { time:formatDuration(tiempoMs), tries:gameState.intentos, prize:formatMoney(premioRanking), guestNote }), 'success');
     showVictoryAnimation({ tiempoMs, intentos: gameState.intentos, premio: premioRanking });
-    if(!isGuestUser()){
-      await addLeaderboardEntry({
-        uid: session.currentUser.uid,
-        user: session.currentUser.nickname,
-        tiempoMs,
-        intentos: gameState.intentos,
-        pares: gameState.matched,
-        premio: premioRanking,
-        avatar
-      });
-    }
   }else{
     showMsg(t('msg.finished', {
       matched:gameState.matched,
@@ -1540,20 +1496,19 @@ export async function endGame(){
     saveGuestBalance();
     updateGuestStats({ pares: gameState.matched, net });
   }else{
-    await addLiveHistory({
-      uid: session.currentUser.uid,
-      user: session.currentUser.nickname,
-      pares: gameState.matched,
-      intentos: gameState.intentos,
-      net,
-      avatar
-    });
-    const updated = await updateUserStats(session.currentUser.uid, {
-      pares: gameState.matched,
-      net,
-      saldo: gameState.saldo
-    });
-    renderUserStats(updated);
+    try{
+      const updated = await finishSoloGameServer({
+        sessionId: gameState.soloSessionId,
+        pares: gameState.matched,
+        intentos: gameState.intentos,
+        tiempoMs
+      });
+      gameState.soloSessionId = null;
+      if(Number.isFinite(Number(updated.saldo))) gameState.saldo = Number(updated.saldo);
+      renderUserStats(updated);
+    }catch(error){
+      showMsg(error?.message || 'No se pudo guardar la partida segura.', 'danger');
+    }
   }
   updateStats();
 }
@@ -1617,6 +1572,11 @@ export async function resetGame(){
   gameState.intentos = 0;
   gameState.round = 1;
   gameState.gananciaPartida = 0;
+  if(gameState.soloSessionId && !isGuestUser()){
+    const cancelled = await cancelSoloGameServer(gameState.soloSessionId).catch(() => null);
+    if(Number.isFinite(Number(cancelled?.saldo))) gameState.saldo = Number(cancelled.saldo);
+  }
+  gameState.soloSessionId = null;
   gameState.onlineWager = 0;
   gameState.onlinePot = 0;
   gameState.startTime = 0;
@@ -1652,6 +1612,11 @@ export async function exitGame(){
     && gameState.matched === 0
     && gameState.intentos === 0;
   const previousSaldo = shouldRefundEntry ? gameState.saldo + C : gameState.saldo;
+  let secureSaldo = previousSaldo;
+  if(gameState.soloSessionId && !isGuestUser()){
+    const cancelled = await cancelSoloGameServer(gameState.soloSessionId).catch(() => null);
+    if(Number.isFinite(Number(cancelled?.saldo))) secureSaldo = Number(cancelled.saldo);
+  }
   gameState.gameToken++;
   gameState.playing = false;
   gameState.blocked = false;
@@ -1666,13 +1631,11 @@ export async function exitGame(){
   gameState.onlinePot = 0;
   gameState.startTime = 0;
   gameState.endTime = 0;
-  gameState.saldo = previousSaldo;
+  gameState.saldo = secureSaldo;
+  gameState.soloSessionId = null;
   gameState.localDuel = createLocalDuelState();
   if(shouldRefundEntry){
     if(isGuestUser()) saveGuestBalance();
-    else if(session.currentUser){
-      setTimeout(() => updateSaldo(session.currentUser.uid, previousSaldo).catch(() => {}), 1200);
-    }
   }
   setNewGameButtonBusy(false);
   clearBoard();

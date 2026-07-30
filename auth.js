@@ -8,9 +8,9 @@ import {
   signInWithPopup
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
-import { auth } from './firebase-config.js?v=71';
+import { auth } from './firebase-config.js?v=72';
 import { INITIAL_SALDO, forbiddenNames } from './constants.js?v=71';
-import { session, gameState, resetGameState } from './state.js?v=72';
+import { session, gameState, resetGameState } from './state.js?v=73';
 import { normalizeNickname, escapeHTML } from './utils.js?v=71';
 import {
   nicknameTaken,
@@ -20,7 +20,7 @@ import {
   createUserProfile,
   syncPublicAwardRankings,
   makeUniqueNickname
-} from './database.js?v=77';
+} from './database.js?v=78';
 import {
   setAuthModeUI,
   showAuthModal,
@@ -34,7 +34,7 @@ import {
   showRulesModalIfNeeded,
   resetAvatarDisplay,
   resetCardSkinDisplay
-} from './ui.js?v=93';
+} from './ui.js?v=95';
 import { t } from './i18n.js?v=1';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
