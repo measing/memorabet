@@ -30,6 +30,7 @@ import {
   hideAuthModal,
   showAuthError,
   showMsg,
+  hideMsg,
   renderUser,
   updateStats,
   clearBoard,
@@ -222,7 +223,7 @@ export async function enterGuestMode({ silent = false } = {}){
   updateAccountButton();
   keepSettingsButtonLabel();
   if(silent){
-    showMsg(t('msg.start'), 'info');
+    hideMsg();
   }else{
     showMsg(t('auth.enteredGuest'), 'success');
     showRulesModalIfNeeded();
@@ -510,7 +511,7 @@ export function listenAuthState(){
       updateStats();
       updateAccountButton();
   keepSettingsButtonLabel();
-      showMsg(t('auth.welcome', { name:escapeHTML(profile.nickname) }), 'info');
+      hideMsg();
       showRulesModalIfNeeded();
     }catch(error){
       showAuthError(`No se pudo cargar el perfil: ${error.message}`);

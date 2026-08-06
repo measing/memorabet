@@ -821,6 +821,10 @@ body::before{
   overflow:hidden;
   margin:0 auto 26px;
 }
+body:not(.game-round-active) .top-hud,
+body:not(.game-round-active) .message{
+  display:none!important;
+}
 .game-round-active .top-hud{
   width:min(720px,86vw);
   margin:0 auto 8px;
@@ -1693,9 +1697,12 @@ body.online-duel-active #btn-exit{
     font-size:22px;
   }
   .coin-gift-button{
-    right:clamp(8px, 3vw, 18px);
-    top:clamp(72px, 18%, 108px);
-    width:clamp(70px, 20vw, 90px);
+    position:fixed;
+    left:18px;
+    right:auto;
+    top:clamp(132px, 20vh, 168px);
+    width:clamp(64px, 18vw, 82px);
+    z-index:70;
   }
   .coin-gift-timer{
     min-width:48px;
@@ -1883,7 +1890,7 @@ body.online-duel-active #btn-exit{
   .casino-menu{grid-template-columns:repeat(2,minmax(0,1fr))}
   .board{grid-template-columns:repeat(4,minmax(62px,1fr));gap:7px}
   .start-game-button{min-width:min(280px,86vw);font-size:20px}
-  .coin-gift-button{width:68px;right:6px}
+  .coin-gift-button{width:64px;left:14px;right:auto}
   .hud-cell{flex-direction:column;gap:3px}
   .bottom-hud{gap:7px}
 }
