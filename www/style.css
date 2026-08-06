@@ -508,6 +508,33 @@ body::before{
   font-size:17px;
   line-height:1.1;
 }
+.friend-presence{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin-top:4px;
+  font-size:13px;
+  font-weight:900;
+}
+.friend-presence span{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  display:inline-block;
+}
+.friend-presence.online{
+  color:var(--green);
+}
+.friend-presence.online span{
+  background:var(--green);
+  box-shadow:0 0 12px rgba(52,244,111,.64);
+}
+.friend-presence.offline{
+  color:#aab0bb;
+}
+.friend-presence.offline span{
+  background:#687080;
+}
 .friend-row-actions{
   display:flex;
   flex-wrap:wrap;

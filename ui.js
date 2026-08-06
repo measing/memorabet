@@ -1,7 +1,7 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
 import { gameState, session } from './state.js?v=72';
 import { escapeHTML, formatMoney } from './utils.js?v=71';
-import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=80';
+import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=81';
 import { t } from './i18n.js?v=1';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';

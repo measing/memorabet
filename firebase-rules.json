@@ -77,6 +77,8 @@
         "uid": { ".validate": "newData.isString() && newData.val() === $uid" },
         "nickname": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30" },
         "avatar": { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "online": { ".validate": "newData.isBoolean()" },
+        "lastSeen": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
         "updatedAt": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
         "$other": { ".validate": false }
       }

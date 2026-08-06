@@ -7,7 +7,7 @@ import {
   rejectFriendRequest,
   removeFriend,
   sendFriendRequest
-} from './database.js?v=80';
+} from './database.js?v=81';
 import { joinOnlineGameByRoom, startFriendOnlineGame } from './game.js?v=89';
 
 const PENDING_FRIEND_KEY = 'memorabetPendingFriend';
@@ -158,6 +158,15 @@ function renderRequests(requests = []){
   `).join('');
 }
 
+function friendPresence(friend = {}){
+  const lastSeen = Number(friend.lastSeen || 0);
+  const freshOnline = friend.online === true && (!lastSeen || Date.now() - lastSeen < 120000);
+  if(freshOnline){
+    return '<p class="friend-presence online"><span></span>Conectado</p>';
+  }
+  return '<p class="friend-presence offline"><span></span>Desconectado</p>';
+}
+
 function renderFriends(friends = []){
   const list = $('friends-list');
   const count = $('friend-count');
@@ -172,7 +181,7 @@ function renderFriends(friends = []){
       <div class="entry-avatar">${avatarMarkup(friend)}</div>
       <div>
         <h3>${escapeHTML(friend.nickname || 'Jugador')}</h3>
-        <p>ID: ${escapeHTML(friend.uid || '')}</p>
+        ${friendPresence(friend)}
       </div>
       <div class="friend-row-actions">
         <button class="friend-mini-action primary" type="button" data-duel-friend="${escapeHTML(friend.uid)}">Pares</button>

@@ -1,4 +1,4 @@
-import { ref, get, set, update, push, onValue, query, limitToLast, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+import { ref, get, set, update, push, onValue, query, limitToLast, remove, runTransaction, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 import { db } from './firebase-config.js?v=72';
 import { INITIAL_SALDO, avatarPool } from './constants.js?v=71';
 import { normalizeNickname } from './utils.js?v=71';
@@ -125,8 +125,42 @@ export async function syncPublicProfile(uid, profile = {}){
     uid,
     nickname: publicRankingName(profile),
     avatar: profile.avatar || '',
+    online: profile.online === false ? false : true,
+    lastSeen: Number(profile.lastSeen || now()),
     updatedAt: now()
   });
+}
+
+export function connectUserPresence(uid, profile = {}){
+  if(!uid) return () => {};
+  const profileRef = ref(db, `publicProfiles/${uid}`);
+  const timestamp = now();
+  const onlinePatch = {
+    uid,
+    nickname: publicRankingName(profile),
+    avatar: profile.avatar || '',
+    online: true,
+    lastSeen: timestamp,
+    updatedAt: timestamp
+  };
+  update(profileRef, onlinePatch).catch(() => {});
+
+  const disconnectRef = onDisconnect(profileRef);
+  disconnectRef.update({
+    online: false,
+    lastSeen: timestamp,
+    updatedAt: timestamp
+  }).catch(() => {});
+
+  return async () => {
+    await disconnectRef.cancel().catch(() => {});
+    const offlineAt = now();
+    await update(profileRef, {
+      online: false,
+      lastSeen: offlineAt,
+      updatedAt: offlineAt
+    }).catch(() => {});
+  };
 }
 
 export async function getPublicProfile(uid){

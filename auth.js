@@ -19,10 +19,11 @@ import {
   releaseNickname,
   getUserProfile,
   createUserProfile,
+  connectUserPresence,
   syncPublicProfile,
   syncPublicAwardRankings,
   makeUniqueNickname
-} from './database.js?v=80';
+} from './database.js?v=81';
 import {
   setAuthModeUI,
   showAuthModal,
@@ -42,6 +43,20 @@ import { deleteAccountServer } from './cloud-functions.js?v=1';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
+let stopPresence = null;
+
+function setPresence(uid, profile){
+  if(stopPresence) stopPresence();
+  stopPresence = connectUserPresence(uid, profile);
+}
+
+async function clearPresence(){
+  if(!stopPresence) return;
+  const stop = stopPresence;
+  stopPresence = null;
+  await stop();
+}
+
 const GUEST_PROFILE = {
   uid: 'guest-local',
   email: '',
@@ -268,6 +283,7 @@ export async function handleGoogleAccount(){
     gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
     renderUser(profile);
     syncPublicProfile(result.user.uid, profile).catch(() => {});
+    setPresence(result.user.uid, profile);
     syncPublicAwardRankings(result.user.uid, profile).catch(() => {});
     updateStats();
     updateAccountButton();
@@ -368,6 +384,7 @@ export async function handleAuthSubmit(){
       hideAuthModal();
       renderUser(profile);
       syncPublicProfile(user.uid, profile).catch(() => {});
+      setPresence(user.uid, profile);
       syncPublicAwardRankings(user.uid, profile).catch(() => {});
       updateStats();
       updateAccountButton();
@@ -410,6 +427,7 @@ export async function handleAuthSubmit(){
       hideAuthModal();
       renderUser(profile);
       syncPublicProfile(uid, profile).catch(() => {});
+      setPresence(uid, profile);
       syncPublicAwardRankings(uid, profile).catch(() => {});
       updateStats();
       updateAccountButton();
@@ -458,6 +476,7 @@ async function rebuildMissingProfile(user){
 export function listenAuthState(){
   onAuthStateChanged(auth, async (user) => {
     if(!user){
+      await clearPresence();
       if(session.isGuestMode && session.currentUser?.isGuest){
         updateAccountButton();
   keepSettingsButtonLabel();
@@ -486,6 +505,7 @@ export function listenAuthState(){
       hideAuthModal();
       renderUser(profile);
       syncPublicProfile(user.uid, profile).catch(() => {});
+      setPresence(user.uid, profile);
       syncPublicAwardRankings(user.uid, profile).catch(() => {});
       updateStats();
       updateAccountButton();
@@ -500,6 +520,7 @@ export function listenAuthState(){
 }
 
 export async function logoutUser(){
+  await clearPresence();
   await signOut(auth);
 }
 

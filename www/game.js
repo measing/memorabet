@@ -15,7 +15,7 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=80';
+} from './database.js?v=81';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=96';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=1';
