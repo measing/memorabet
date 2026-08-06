@@ -1,5 +1,5 @@
 import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=89';
-import { claimCoinGift, closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel, updateCoinGiftButton } from './game.js?v=95';
+import { claimCoinGift, closeCoinGiftModal, closeGameModePanel, exitGame, openCoinGiftModal, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel, updateCoinGiftButton } from './game.js?v=96';
 import { listenLiveHistory, listenLeaderboard } from './database.js?v=84';
 import { session } from './state.js?v=73';
 import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=101';
@@ -118,7 +118,12 @@ function bindEvents(){
     if(!session.currentUser) await enterGuestMode({ silent:true });
     await startSelectedGame();
   });
-  document.getElementById('btn-coin-gift')?.addEventListener('click', claimCoinGift);
+  document.getElementById('btn-coin-gift')?.addEventListener('click', openCoinGiftModal);
+  document.getElementById('coin-gift-close')?.addEventListener('click', closeCoinGiftModal);
+  document.getElementById('coin-gift-claim')?.addEventListener('click', claimCoinGift);
+  document.getElementById('coin-gift-modal')?.addEventListener('click', event => {
+    if(event.target === event.currentTarget) closeCoinGiftModal();
+  });
   document.getElementById('btn-start-login')?.addEventListener('click', () => openAuth('login'));
   document.getElementById('btn-start-google')?.addEventListener('click', handleGoogleAccount);
   document.getElementById('btn-start-register')?.addEventListener('click', () => openAuth('register'));

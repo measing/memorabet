@@ -1052,8 +1052,7 @@ body.account-connected .start-auth-actions{
   transform:translateY(-50%) scale(1.05);
   filter:drop-shadow(0 12px 22px rgba(0,0,0,.62)) drop-shadow(0 0 22px rgba(73,176,255,.42));
 }
-.coin-gift-button:disabled{
-  cursor:not-allowed;
+.coin-gift-button.waiting{
   filter:grayscale(.25) brightness(.74) drop-shadow(0 8px 14px rgba(0,0,0,.55));
 }
 .coin-gift-img{
@@ -1079,11 +1078,96 @@ body.account-connected .start-auth-actions{
   text-align:center;
   box-shadow:0 3px 0 rgba(82,37,0,.78), 0 0 12px rgba(255,208,68,.34);
 }
-.coin-gift-button:disabled .coin-gift-timer{
+.coin-gift-button.waiting .coin-gift-timer{
   background:linear-gradient(180deg, rgba(35,39,50,.96), rgba(14,16,22,.96));
   border-color:rgba(255,255,255,.28);
   color:#fff;
   box-shadow:0 3px 0 rgba(0,0,0,.7), 0 0 10px rgba(0,0,0,.25);
+}
+.coin-gift-claim:disabled{
+  cursor:not-allowed;
+  opacity:.62;
+  filter:saturate(.55);
+}
+.coin-gift-modal{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(0,0,0,.72);
+  backdrop-filter:blur(5px);
+}
+.coin-gift-modal[hidden]{
+  display:none!important;
+}
+.coin-gift-box{
+  position:relative;
+  width:min(430px, calc(100vw - 30px));
+  max-height:92vh;
+  overflow-y:auto;
+  display:grid;
+  justify-items:center;
+  gap:12px;
+  padding:20px 20px 22px;
+  border:2px solid rgba(249,199,79,.92);
+  border-radius:18px;
+  background:linear-gradient(180deg, rgba(14,20,31,.98), rgba(4,5,8,.98));
+  box-shadow:0 0 44px rgba(249,199,79,.24), inset 0 0 20px rgba(255,255,255,.04);
+  text-align:center;
+}
+.coin-gift-close{
+  position:absolute;
+  top:10px;
+  right:10px;
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  border:1px solid rgba(249,199,79,.78);
+  background:rgba(255,255,255,.06);
+  color:white;
+  font-size:25px;
+  font-weight:900;
+  cursor:pointer;
+}
+.coin-gift-info-img{
+  width:100%;
+  max-height:230px;
+  object-fit:cover;
+  border-radius:12px;
+  border:1px solid rgba(249,199,79,.34);
+}
+.coin-gift-box h2{
+  margin-top:2px;
+  font-family:var(--font-display);
+  font-size:34px;
+  line-height:1;
+  color:var(--gold);
+}
+.coin-gift-box p{
+  color:#e9e3d9;
+  font-size:15px;
+  line-height:1.35;
+}
+.coin-gift-claim{
+  width:100%;
+  min-height:52px;
+  border:1px solid rgba(140,255,157,.9);
+  border-radius:12px;
+  background:linear-gradient(180deg,#2ce84f,#05831e);
+  color:white;
+  font-weight:1000;
+  cursor:pointer;
+  text-transform:uppercase;
+  box-shadow:0 0 26px rgba(53,244,107,.22), inset 0 0 12px rgba(255,255,255,.18);
+}
+.coin-gift-box small{
+  min-height:18px;
+  color:#ffd35a;
+  font-size:13px;
+  font-weight:900;
 }
 .auth-modal-open .start-game-panel,
 body:has(#auth-modal[style*="display: flex"]) .start-game-panel{
@@ -1690,17 +1774,23 @@ body.online-duel-active #btn-exit{
     max-height:220px;
   }
   .start-game-button{
+    width:100%;
     min-width:0;
     min-height:74px;
     padding:18px 20px;
     border-radius:14px;
     font-size:22px;
   }
+  .start-actions{
+    width:min(640px, 86vw);
+    margin-inline:auto;
+    justify-self:center;
+  }
   .coin-gift-button{
     position:fixed;
-    left:18px;
+    left:22px;
     right:auto;
-    top:clamp(132px, 20vh, 168px);
+    top:clamp(142px, 19vh, 176px);
     width:clamp(64px, 18vw, 82px);
     z-index:70;
   }
@@ -1890,7 +1980,7 @@ body.online-duel-active #btn-exit{
   .casino-menu{grid-template-columns:repeat(2,minmax(0,1fr))}
   .board{grid-template-columns:repeat(4,minmax(62px,1fr));gap:7px}
   .start-game-button{min-width:min(280px,86vw);font-size:20px}
-  .coin-gift-button{width:64px;left:14px;right:auto}
+  .coin-gift-button{width:64px;left:16px;right:auto}
   .hud-cell{flex-direction:column;gap:3px}
   .bottom-hud{gap:7px}
 }

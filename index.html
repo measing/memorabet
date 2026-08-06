@@ -14,7 +14,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=3" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png?v=3" />
   <link rel="apple-touch-icon" href="assets/app-icon-192.png?v=3" />
-  <link rel="stylesheet" href="style.css?v=113" />
+  <link rel="stylesheet" href="style.css?v=114" />
 </head>
 <body>
   <div id="mobile-loading-screen" class="mobile-loading-screen" aria-hidden="true">
@@ -426,6 +426,17 @@
     </div>
   </div>
 
+  <div class="coin-gift-modal" id="coin-gift-modal" hidden>
+    <div class="coin-gift-box">
+      <button class="coin-gift-close" id="coin-gift-close" type="button" aria-label="Cerrar">&times;</button>
+      <img src="assets/coin-gift-info.png" alt="" class="coin-gift-info-img" draggable="false" />
+      <h2>Regalo de monedas</h2>
+      <p>Te entregamos $1.000 de saldo ficticio cada 2 horas para que puedas seguir jugando si pierdes tus coins.</p>
+      <button class="coin-gift-claim" id="coin-gift-claim" type="button">Reclamar $1.000</button>
+      <small id="coin-gift-modal-status">Disponible cada 2h</small>
+    </div>
+  </div>
+
   <script>
     (function(){
       var isLocalFile = window.location.protocol === 'file:';
@@ -470,6 +481,6 @@
       setTimeout(installFallback, isLocalFile ? 800 : 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=126"></script>
+  <script type="module" src="main.js?v=127"></script>
 </body>
 </html>

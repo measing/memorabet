@@ -1288,20 +1288,41 @@ function formatCoinGiftWait(ms){
 
 export function updateCoinGiftButton(){
   const button = document.getElementById('btn-coin-gift');
+  const claimButton = document.getElementById('coin-gift-claim');
   const timer = document.getElementById('coin-gift-timer');
+  const modalStatus = document.getElementById('coin-gift-modal-status');
   if(!button || !timer) return;
 
   const nextAt = getNextCoinGiftAt();
   const remaining = nextAt - Date.now();
   const ready = remaining <= 0;
-  button.disabled = !ready;
+  button.disabled = false;
+  button.classList.toggle('waiting', !ready);
+  if(claimButton) claimButton.disabled = !ready;
   button.setAttribute('aria-label', ready ? t('coinGift.title') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) }));
   button.title = ready ? t('coinGift.title') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) });
   timer.textContent = ready ? '$1.000' : formatCoinGiftWait(remaining);
+  if(modalStatus) modalStatus.textContent = ready ? t('coinGift.ready') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) });
+}
+
+export function openCoinGiftModal(){
+  const modal = document.getElementById('coin-gift-modal');
+  if(!modal) return;
+  modal.hidden = false;
+  document.body.classList.add('auth-modal-open');
+  updateCoinGiftButton();
+}
+
+export function closeCoinGiftModal(){
+  const modal = document.getElementById('coin-gift-modal');
+  if(!modal) return;
+  modal.hidden = true;
+  document.body.classList.remove('auth-modal-open');
 }
 
 export async function claimCoinGift(){
   if(!session.currentUser){
+    closeCoinGiftModal();
     window.dispatchEvent(new CustomEvent('memorabet-open-auth', { detail:{ mode:'choice' } }));
     showMsg(t('coinGift.login'), 'warning');
     return;
@@ -1326,6 +1347,7 @@ export async function claimCoinGift(){
   else await updateCoinGift(uid, gameState.saldo, nextClaimAt);
   updateStats();
   updateCoinGiftButton();
+  closeCoinGiftModal();
   showMsg(t('coinGift.claimed', { amount:formatMoney(COIN_GIFT_AMOUNT) }), 'success');
 }
 

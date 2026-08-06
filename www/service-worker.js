@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-web-v129';
+const CACHE_NAME = 'memorabet-web-v130';
 
 const LOCAL_ASSETS = [
   './',
@@ -25,6 +25,7 @@ const LOCAL_ASSETS = [
   './assets/memorabet-logo.png',
   './assets/mobile-loading.png',
   './assets/coin-gift.png',
+  './assets/coin-gift-info.png',
   './assets/sudden-death.png',
   './assets/casino-background.png',
   './assets/favicon-16.png',
