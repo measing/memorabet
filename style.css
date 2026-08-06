@@ -399,6 +399,9 @@ body::before{
   align-items:center;
   gap:18px;
 }
+.friend-duel-panel[hidden]{
+  display:none!important;
+}
 .friend-qr-box{
   width:168px;
   aspect-ratio:1;

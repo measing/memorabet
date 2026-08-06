@@ -126,6 +126,10 @@ function hidePrivateDuelPanel(){
   if(panel) panel.hidden = true;
   if(input) input.value = '';
   if(qr) qr.removeAttribute('src');
+  const status = $('friends-status');
+  if(status && status.textContent.toLowerCase().includes('duelo')){
+    setStatus('');
+  }
 }
 
 function avatarMarkup(friend){
