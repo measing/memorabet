@@ -1288,16 +1288,16 @@ function formatCoinGiftWait(ms){
 
 export function updateCoinGiftButton(){
   const button = document.getElementById('btn-coin-gift');
-  const title = document.getElementById('coin-gift-title');
   const timer = document.getElementById('coin-gift-timer');
-  if(!button || !title || !timer) return;
+  if(!button || !timer) return;
 
   const nextAt = getNextCoinGiftAt();
   const remaining = nextAt - Date.now();
   const ready = remaining <= 0;
   button.disabled = !ready;
-  title.textContent = ready ? t('coinGift.title') : t('coinGift.waitTitle');
-  timer.textContent = ready ? t('coinGift.ready') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) });
+  button.setAttribute('aria-label', ready ? t('coinGift.title') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) }));
+  button.title = ready ? t('coinGift.title') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) });
+  timer.textContent = ready ? '$1.000' : formatCoinGiftWait(remaining);
 }
 
 export async function claimCoinGift(){

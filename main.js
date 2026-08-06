@@ -1,5 +1,5 @@
 import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=88';
-import { claimCoinGift, closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel, updateCoinGiftButton } from './game.js?v=94';
+import { claimCoinGift, closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel, updateCoinGiftButton } from './game.js?v=95';
 import { listenLiveHistory, listenLeaderboard } from './database.js?v=84';
 import { session } from './state.js?v=73';
 import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=101';
