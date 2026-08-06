@@ -15,6 +15,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "39967822156-93708u7igpdidb0vq56ke8s4v905onsq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.memorabet.app",
+            "certificate_hash": "dc1487982e5214f6bf2d45fc53cb8e7a43788b84"
+          }
+        },
+        {
+          "client_id": "39967822156-poh939lvpeei3eu7kji4stqkgostdstc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.memorabet.app",
+            "certificate_hash": "269bb152f9b620cf189c9538b8dc26370c6e30df"
+          }
+        },
+        {
           "client_id": "39967822156-2afh5utst5tr10r575k62ai2f9vsehst.apps.googleusercontent.com",
           "client_type": 3
         }
