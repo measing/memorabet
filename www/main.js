@@ -4,7 +4,7 @@ import { listenLiveHistory, listenLeaderboard } from './database.js?v=83';
 import { session } from './state.js?v=73';
 import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=101';
 import { initAudioControls } from './audio.js?v=73';
-import { initI18n, translatePage } from './i18n.js?v=1';
+import { initI18n, translatePage } from './i18n.js?v=2';
 import { initFriendsFeature, refreshFriendsFeature } from './friends.js?v=5';
 
 window.__memorabetMainLoaded = true;

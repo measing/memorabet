@@ -88,7 +88,7 @@
       <h2 id="settings-title">Configuración</h2>
 
       <section class="settings-section">
-        <h3>Cuenta</h3>
+        <h3 id="settings-account-heading">Cuenta</h3>
         <p id="settings-account-status">Juega como invitado o guarda tu progreso con una cuenta.</p>
         <div class="settings-actions">
           <button id="btn-google-account" class="settings-action google-action" type="button">Continuar con Google</button>
@@ -101,16 +101,15 @@
       </section>
 
       <section class="settings-section">
-        <h3>Legal</h3>
-        <p>MemoraBet usa solo saldo ficticio. No hay apuestas con dinero real ni premios reales.</p>
+        <h3 id="settings-legal-heading">Legal</h3>
+        <p id="settings-legal-text">MemoraBet usa solo saldo ficticio. No hay apuestas con dinero real ni premios reales.</p>
         <div class="settings-actions">
-          <a class="settings-action legal-link" href="privacidad.html" target="_blank" rel="noopener">Politica de privacidad</a>
-          <a class="settings-action legal-link" href="eliminar-cuenta.html" target="_blank" rel="noopener">Solicitud de eliminacion de cuenta</a>
+          <a id="settings-privacy-link" class="settings-action legal-link" href="privacidad.html" target="_blank" rel="noopener">Politica de privacidad</a>
         </div>
       </section>
 
       <section class="settings-section">
-        <h3>Idioma</h3>
+        <h3 id="settings-language-heading">Idioma</h3>
         <label class="language-row">
           <span id="settings-language-label">Idioma del juego</span>
           <select id="language-select" aria-label="Idioma del juego"></select>
@@ -118,7 +117,7 @@
       </section>
 
       <section class="settings-section">
-        <h3>Audio</h3>
+        <h3 id="settings-audio-heading">Audio</h3>
         <label class="volume-row">
           <span><span id="volume-master-text">General</span> <strong id="volume-master-value">50%</strong></span>
           <input id="volume-master" type="range" min="0" max="100" step="1" />
@@ -467,6 +466,6 @@
       setTimeout(installFallback, isLocalFile ? 800 : 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=122"></script>
+  <script type="module" src="main.js?v=123"></script>
 </body>
 </html>

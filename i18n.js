@@ -33,6 +33,9 @@ const DICTIONARY = {
     'settings.audio':'Audio',
     'settings.language':'Idioma',
     'settings.languageLabel':'Idioma del juego',
+    'settings.legal':'Legal',
+    'settings.legalText':'MemoraBet usa solo saldo ficticio. No hay apuestas con dinero real ni premios reales.',
+    'settings.privacyPolicy':'Politica de privacidad',
     'settings.guestStatus':'Juega como invitado o guarda tu progreso con una cuenta.',
     'settings.guestLinkedStatus':'Estás jugando como invitado. Enlaza una cuenta para guardar ranking, historial y compras.',
     'settings.connectedStatus':'Conectado como {name}.',
@@ -228,7 +231,7 @@ const DICTIONARY = {
     'victory.tries':'Intentos'
   },
   en:{
-    'settings.title':'Settings','settings.account':'Account','settings.audio':'Audio','settings.language':'Language','settings.languageLabel':'Game language','settings.guestStatus':'Play as guest or save your progress with an account.','settings.guestLinkedStatus':'You are playing as guest. Link an account to save ranking, history, and purchases.','settings.connectedStatus':'Connected as {name}.','settings.googleContinue':'Continue with Google','settings.googleChange':'Switch to Google','settings.googleLink':'Link with Google','settings.emailRegister':'Create account with email','settings.emailLogin':'Sign in with email','settings.logout':'Log out','settings.deleteAccount':'Delete account','settings.master':'Master','settings.music':'Music','settings.effects':'Effects',
+    'settings.title':'Settings','settings.account':'Account','settings.audio':'Audio','settings.language':'Language','settings.languageLabel':'Game language','settings.legal':'Legal','settings.legalText':'MemoraBet only uses fictional balance. There are no real-money bets or real prizes.','settings.privacyPolicy':'Privacy policy','settings.guestStatus':'Play as guest or save your progress with an account.','settings.guestLinkedStatus':'You are playing as guest. Link an account to save ranking, history, and purchases.','settings.connectedStatus':'Connected as {name}.','settings.googleContinue':'Continue with Google','settings.googleChange':'Switch to Google','settings.googleLink':'Link with Google','settings.emailRegister':'Create account with email','settings.emailLogin':'Sign in with email','settings.logout':'Log out','settings.deleteAccount':'Delete account','settings.master':'Master','settings.music':'Music','settings.effects':'Effects',
     'nav.play':'Play','nav.store':'Store','nav.profile':'Profile','nav.ranking':'Ranking','nav.history':'History','common.player':'Player','common.guest':'Guest','common.loading':'Preparing game...','common.close':'Close','common.free':'Free','common.use':'Use','common.equip':'Equip','common.buy':'Buy','common.equipped':'Equipped','common.now':'Right now','common.secondsAgo':'{seconds} sec ago',
     'auth.title':'MemoraBet Account','auth.subtitle':'Create an account or sign in to save balance, history, and online ranking.','auth.login':'Sign in','auth.loginShort':'Sign in','auth.register':'Create account','auth.google':'Sign in with Google','auth.back':'Back','auth.email':'Email','auth.password':'Password','auth.nickname':'Unique nickname','auth.nicknameFinal':'Choose your final nickname','auth.saveNickname':'Save nickname','auth.guest':'Play as guest','auth.keepGuest':'Keep playing as guest','auth.emailPasswordRequired':'Enter email and password.','auth.passwordLength':'Password must have at least 6 characters.','auth.nicknameLength':'Nickname must be 3 to 16 characters.','auth.nicknameChars':'Nickname can only use letters, numbers, and underscore.','auth.nicknameForbidden':'That nickname is not allowed.','auth.emailInUse':'That email is already registered. Use Sign in.','auth.invalidEmail':'The email is not valid.','auth.invalidCredential':'Wrong email or password.','auth.wrongPassword':'Wrong password.','auth.tooMany':'Too many attempts. Wait a moment.','auth.popupClosed':'The Google window was closed before finishing.','auth.popupBlocked':'The browser blocked the Google window.','auth.googleDisabled':'Google is not enabled in Firebase Authentication.','auth.unknown':'Could not sign in. Check your data and try again.','auth.openingGoogle':'Opening Google...','auth.guestProgress':'If you sign in or create an account, your progress will be saved online from now on.','auth.createProgress':'Create your account to save progress online.','auth.loginRecover':'Sign in to recover your account.','auth.connected':'Account connected as {name}.','auth.enteredGuest':'You entered as guest. You can play now and create an account from Settings whenever you want.','auth.profileCreated':'Profile created as {name}. Press Start game to begin.','auth.accountCreated':'Account created as {name}. Press Start game to begin.','auth.welcome':'Welcome, {name}. Press Start game to begin.',
     'rules.title':'Game rules','rules.close':'Close rules','rules.one':'Find all matching card pairs.','rules.two':'The fewer tries you use, the bigger your reward.','rules.three':'You earn money for each pair found.','rules.four':'Complete all 8 pairs to enter the global ranking.','rules.five':'If you restart before finishing, you lose that game progress.','rules.dontShow':'Do not show these rules again','rules.accept':'Got it, do not show again',
@@ -315,9 +318,12 @@ export function translatePage(){
   document.documentElement.lang = lang;
 
   setText('#settings-title', 'settings.title');
-  setText('#settings-modal .settings-section:nth-of-type(1) h3', 'settings.account');
-  setText('#settings-modal .settings-section:nth-of-type(2) h3', 'settings.language');
-  setText('#settings-modal .settings-section:nth-of-type(3) h3', 'settings.audio');
+  setText('#settings-account-heading', 'settings.account');
+  setText('#settings-legal-heading', 'settings.legal');
+  setText('#settings-legal-text', 'settings.legalText');
+  setText('#settings-privacy-link', 'settings.privacyPolicy');
+  setText('#settings-language-heading', 'settings.language');
+  setText('#settings-audio-heading', 'settings.audio');
   setText('#settings-language-label', 'settings.languageLabel');
   setText('#btn-email-register', 'settings.emailRegister');
   setText('#btn-email-login', 'settings.emailLogin');
