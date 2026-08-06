@@ -3,6 +3,7 @@ import { createLocalDuelState, gameState, session } from './state.js?v=73';
 import { shuffle, wait, formatMoney } from './utils.js?v=71';
 import {
   updateSaldo,
+  updateCoinGift,
   applyOnlineResult,
   addLiveHistory,
   updateUserStats,
@@ -15,7 +16,7 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=83';
+} from './database.js?v=84';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=1';
@@ -36,8 +37,12 @@ let lastOnlineRoomStatus = null;
 let lastSuddenDeathNoticeKey = null;
 let handledOnlineFinishId = null;
 let appliedOnlineEconomyRoomId = null;
+let settlingOnlineEconomyRoomId = null;
 const LOCAL_SOLO_SESSION_ID = 'local-fallback';
 const ONLINE_TURN_DURATION_MS = 10000;
+const COIN_GIFT_AMOUNT = 1000;
+const COIN_GIFT_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+const COIN_GIFT_KEY = 'memorabetCoinGiftAt';
 
 const VISIBLE_SHUFFLE_SWAPS = [
   [0, 5], [3, 10], [12, 7], [15, 2],
@@ -191,6 +196,15 @@ async function settleOnlineEconomy(room){
   return settleOnlineRoomServer(freshRoom.id);
 }
 
+function requestOnlineEconomySettlement(room){
+  if(!room?.id || room.status !== 'finished' || room.economySettled) return;
+  if(settlingOnlineEconomyRoomId === room.id || !canAdvanceOnlineRoom(room)) return;
+  settlingOnlineEconomyRoomId = room.id;
+  settleOnlineEconomy(room).catch(() => {
+    settlingOnlineEconomyRoomId = null;
+  });
+}
+
 async function applyOnlineEconomyForCurrentUser(room){
   if(!room?.economySettled || !room.economyRewards || appliedOnlineEconomyRoomId === room.id) return;
   const uid = session.currentUser?.uid;
@@ -226,6 +240,7 @@ function resetOnlineClientToLobby(message = t('online.finished')){
   lastOnlineRoomStatus = null;
   handledOnlineFinishId = null;
   appliedOnlineEconomyRoomId = null;
+  settlingOnlineEconomyRoomId = null;
   if(onlineRoomUnsubscribe){
     onlineRoomUnsubscribe();
     onlineRoomUnsubscribe = null;
@@ -636,9 +651,25 @@ function applyOnlineRoom(room){
     playRivalFound();
   }
   lastOnlineRoomStatus = room.status;
-  if(room.status === 'finished' && !room.economySettled && session.currentUser?.uid === room.hostUid){
-    settleOnlineEconomy(room).catch(() => {});
-    return;
+  if(room.status === 'finished' && !room.economySettled){
+    requestOnlineEconomySettlement(room);
+  }
+  if(room.status === 'finished' && room.concededBy && !room.economySettled && handledOnlineFinishId !== room.id){
+    const winner = getOnlineWinner(room);
+    const winnerName = winner.name || t('common.player');
+    const isWinner = winner.uid === session.currentUser?.uid;
+    if(isWinner){
+      handledOnlineFinishId = room.id;
+      showOnlineVictoryAnimation({
+        winnerName,
+        reason:t('online.defaultWin'),
+        pot:Number(room.pot || 0),
+        cupText:'',
+        autoCloseMs: 3200
+      });
+      setTimeout(() => resetOnlineClientToLobby(t('online.defaultWinLobby')), 3300);
+      return;
+    }
   }
   if(room.status === 'finished' && room.economySettled && handledOnlineFinishId !== room.id){
     handledOnlineFinishId = room.id;
@@ -1187,6 +1218,68 @@ export function closeGameModePanel(){
 
 function saveGuestBalance(){
   if(isGuestUser()) localStorage.setItem(GUEST_BALANCE_KEY, String(gameState.saldo));
+}
+
+function getCoinGiftStorageKey(){
+  const uid = session.currentUser?.uid || 'guest-local';
+  return `${COIN_GIFT_KEY}:${uid}`;
+}
+
+function getNextCoinGiftAt(){
+  return Number(localStorage.getItem(getCoinGiftStorageKey()) || 0);
+}
+
+function formatCoinGiftWait(ms){
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if(hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+  if(minutes > 0) return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+  return `${seconds}s`;
+}
+
+export function updateCoinGiftButton(){
+  const button = document.getElementById('btn-coin-gift');
+  const title = document.getElementById('coin-gift-title');
+  const timer = document.getElementById('coin-gift-timer');
+  if(!button || !title || !timer) return;
+
+  const nextAt = getNextCoinGiftAt();
+  const remaining = nextAt - Date.now();
+  const ready = remaining <= 0;
+  button.disabled = !ready;
+  title.textContent = ready ? t('coinGift.title') : t('coinGift.waitTitle');
+  timer.textContent = ready ? t('coinGift.ready') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) });
+}
+
+export async function claimCoinGift(){
+  if(!session.currentUser){
+    window.dispatchEvent(new CustomEvent('memorabet-open-auth', { detail:{ mode:'choice' } }));
+    showMsg(t('coinGift.login'), 'warning');
+    return;
+  }
+
+  const uid = session.currentUser.uid;
+  const profile = !isGuestUser() ? await getUserProfile(uid).catch(() => null) : null;
+  const remoteNextAt = Number(profile?.coinGiftNextAt || 0);
+  const nextAt = Math.max(getNextCoinGiftAt(), remoteNextAt);
+  const remaining = nextAt - Date.now();
+  if(remaining > 0){
+    localStorage.setItem(getCoinGiftStorageKey(), String(nextAt));
+    updateCoinGiftButton();
+    showMsg(t('coinGift.wait', { time:formatCoinGiftWait(remaining) }), 'warning');
+    return;
+  }
+
+  const nextClaimAt = Date.now() + COIN_GIFT_COOLDOWN_MS;
+  gameState.saldo = Number(profile?.saldo ?? gameState.saldo) + COIN_GIFT_AMOUNT;
+  localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
+  if(isGuestUser()) saveGuestBalance();
+  else await updateCoinGift(uid, gameState.saldo, nextClaimAt);
+  updateStats();
+  updateCoinGiftButton();
+  showMsg(t('coinGift.claimed', { amount:formatMoney(COIN_GIFT_AMOUNT) }), 'success');
 }
 
 function updateGuestStats({ pares, net }){

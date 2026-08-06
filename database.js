@@ -247,6 +247,14 @@ export async function updateSaldo(uid, saldo){
   await update(ref(db, `users/${uid}`), { saldo, updatedAt: now() });
 }
 
+export async function updateCoinGift(uid, saldo, coinGiftNextAt){
+  await update(ref(db, `users/${uid}`), {
+    saldo,
+    coinGiftNextAt,
+    updatedAt: now()
+  });
+}
+
 async function updatePublicAvatar(uid, avatar){
   const paths = [`ranking/${uid}`, `rankingMedals/${uid}`, `rankingCups/${uid}`];
   await Promise.all(paths.map(async path => {

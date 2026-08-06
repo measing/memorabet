@@ -14,7 +14,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=3" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png?v=3" />
   <link rel="apple-touch-icon" href="assets/app-icon-192.png?v=3" />
-  <link rel="stylesheet" href="style.css?v=109" />
+  <link rel="stylesheet" href="style.css?v=110" />
 </head>
 <body>
   <div id="mobile-loading-screen" class="mobile-loading-screen" aria-hidden="true">
@@ -204,6 +204,13 @@
                 <button class="start-auth-button" id="btn-start-register" type="button">Crear cuenta</button>
               </div>
               <button class="start-game-button" id="btn-start-center" type="button">Comenzar juego</button>
+              <button class="coin-gift-button" id="btn-coin-gift" type="button">
+                <span class="coin-gift-icon" aria-hidden="true">&#127873;</span>
+                <span class="coin-gift-copy">
+                  <strong id="coin-gift-title">Reclamar $1.000</strong>
+                  <small id="coin-gift-timer">Disponible cada 2h</small>
+                </span>
+              </button>
               <button class="mode-picker-button" id="btn-mode-picker" type="button">Elegir modo de juego</button>
               <p class="selected-mode-label" id="selected-mode-label"></p>
             </div>
@@ -466,6 +473,6 @@
       setTimeout(installFallback, isLocalFile ? 800 : 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=123"></script>
+  <script type="module" src="main.js?v=124"></script>
 </body>
 </html>

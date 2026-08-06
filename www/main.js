@@ -1,10 +1,10 @@
 import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=88';
-import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=93';
-import { listenLiveHistory, listenLeaderboard } from './database.js?v=83';
+import { claimCoinGift, closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel, updateCoinGiftButton } from './game.js?v=94';
+import { listenLiveHistory, listenLeaderboard } from './database.js?v=84';
 import { session } from './state.js?v=73';
 import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=101';
 import { initAudioControls } from './audio.js?v=73';
-import { initI18n, translatePage } from './i18n.js?v=2';
+import { initI18n, translatePage } from './i18n.js?v=3';
 import { initFriendsFeature, refreshFriendsFeature } from './friends.js?v=5';
 
 window.__memorabetMainLoaded = true;
@@ -118,6 +118,7 @@ function bindEvents(){
     if(!session.currentUser) await enterGuestMode({ silent:true });
     await startSelectedGame();
   });
+  document.getElementById('btn-coin-gift')?.addEventListener('click', claimCoinGift);
   document.getElementById('btn-start-login')?.addEventListener('click', () => openAuth('login'));
   document.getElementById('btn-start-google')?.addEventListener('click', handleGoogleAccount);
   document.getElementById('btn-start-register')?.addEventListener('click', () => openAuth('register'));
@@ -155,12 +156,14 @@ initI18n();
 initFriendsFeature();
 setAuthMode('choice');
 updateStats();
+updateCoinGiftButton();
 listenAuthState();
 
 document.addEventListener('memorabet-language-change', () => {
   translatePage();
   setAuthMode(session.authMode || 'choice');
   updateStats();
+  updateCoinGiftButton();
   renderLiveHistoryList();
   renderLeaderboard();
 });
@@ -177,6 +180,7 @@ listenLeaderboard(ranking => {
 
 setInterval(() => {
   updateStats();
+  updateCoinGiftButton();
   renderLiveHistoryList();
   refreshFriendsFeature();
 }, 1000);

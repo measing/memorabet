@@ -30,6 +30,9 @@
         "saldo": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
         },
+        "coinGiftNextAt": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= now + 7500000"
+        },
         "games": {
           ".validate": "newData.isNumber() && newData.val() >= 0"
         },
