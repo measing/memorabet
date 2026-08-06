@@ -1,12 +1,16 @@
-const CACHE_NAME = 'memorabet-web-v105';
+const CACHE_NAME = 'memorabet-web-v110';
 
 const LOCAL_ASSETS = [
   './',
   './index.html',
+  './privacidad.html',
+  './eliminar-cuenta.html',
   './style.css',
   './main.js',
   './auth.js',
   './audio.js',
+  './app-check-config.js',
+  './cloud-functions.js',
   './constants.js',
   './database.js',
   './firebase-config.js',
@@ -18,6 +22,7 @@ const LOCAL_ASSETS = [
   './manifest.webmanifest',
   './assets/logo.png',
   './assets/memorabet-logo.png',
+  './assets/sudden-death.png',
   './assets/casino-background.png',
   './assets/app-icon-192.png',
   './assets/app-icon-512.png',

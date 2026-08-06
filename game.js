@@ -35,6 +35,7 @@ let lastOnlineRoomStatus = null;
 let lastSuddenDeathNoticeKey = null;
 let handledOnlineFinishId = null;
 let appliedOnlineEconomyRoomId = null;
+const LOCAL_SOLO_SESSION_ID = 'local-fallback';
 
 const VISIBLE_SHUFFLE_SWAPS = [
   [0, 5], [3, 10], [12, 7], [15, 2],
@@ -44,6 +45,60 @@ const VISIBLE_SHUFFLE_SWAPS = [
 
 function isGuestUser(){
   return !!session.currentUser?.isGuest;
+}
+
+function shouldUseLocalSoloFallback(error){
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return code.includes('internal')
+    || code.includes('unavailable')
+    || code.includes('not-found')
+    || message === 'internal'
+    || message.includes('internal')
+    || message.includes('app check')
+    || message.includes('function')
+    || message.includes('network');
+}
+
+async function startSoloLocalFallback(){
+  const uid = session.currentUser?.uid;
+  if(!uid) throw new Error('Inicia sesion nuevamente para jugar.');
+  gameState.soloSessionId = LOCAL_SOLO_SESSION_ID;
+  gameState.saldo -= C;
+  await updateSaldo(uid, gameState.saldo);
+  showMsg('Modo Android de prueba: partida iniciada con Firebase local.', 'warning');
+}
+
+async function finishSoloLocalFallback({ tiempoMs, premioRanking }){
+  const uid = session.currentUser?.uid;
+  if(!uid) return;
+  const user = session.currentUser?.nickname || 'Jugador';
+  const avatar = getSelectedAvatar();
+  const updated = await updateUserStats(uid, {
+    pares: gameState.matched,
+    net: gameState.gananciaPartida,
+    saldo: gameState.saldo
+  });
+  await addLiveHistory({
+    uid,
+    user,
+    pares: gameState.matched,
+    intentos: gameState.intentos,
+    net: gameState.gananciaPartida,
+    avatar
+  });
+  if(gameState.matched === TOTAL_PAIRS){
+    await addLeaderboardEntry({
+      uid,
+      user,
+      tiempoMs,
+      intentos: gameState.intentos,
+      pares: gameState.matched,
+      premio: premioRanking,
+      avatar
+    });
+  }
+  renderUserStats(updated);
 }
 
 function isOnlineDuelActive(){
@@ -1192,11 +1247,24 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
         gameState.soloSessionId = started.sessionId || null;
         gameState.saldo = Number(started.saldo ?? (gameState.saldo - C));
       }catch(error){
-        gameState.starting = false;
-        gameState.blocked = false;
-        setNewGameButtonBusy(false);
-        showMsg(error?.message || 'No se pudo iniciar la partida segura.', 'danger');
-        return;
+        if(shouldUseLocalSoloFallback(error)){
+          console.warn('MemoraBet secure start fallback:', error);
+          try{
+            await startSoloLocalFallback();
+          }catch(fallbackError){
+            gameState.starting = false;
+            gameState.blocked = false;
+            setNewGameButtonBusy(false);
+            showMsg(fallbackError?.message || 'No se pudo iniciar la partida.', 'danger');
+            return;
+          }
+        }else{
+          gameState.starting = false;
+          gameState.blocked = false;
+          setNewGameButtonBusy(false);
+          showMsg(error?.message || 'No se pudo iniciar la partida segura.', 'danger');
+          return;
+        }
       }
     }
   }
@@ -1497,17 +1565,33 @@ export async function endGame(){
     updateGuestStats({ pares: gameState.matched, net });
   }else{
     try{
-      const updated = await finishSoloGameServer({
-        sessionId: gameState.soloSessionId,
-        pares: gameState.matched,
-        intentos: gameState.intentos,
-        tiempoMs
-      });
+      let updated = null;
+      if(gameState.soloSessionId === LOCAL_SOLO_SESSION_ID){
+        await finishSoloLocalFallback({ tiempoMs, premioRanking });
+      }else{
+        updated = await finishSoloGameServer({
+          sessionId: gameState.soloSessionId,
+          pares: gameState.matched,
+          intentos: gameState.intentos,
+          tiempoMs
+        });
+      }
       gameState.soloSessionId = null;
-      if(Number.isFinite(Number(updated.saldo))) gameState.saldo = Number(updated.saldo);
-      renderUserStats(updated);
+      if(updated){
+        if(Number.isFinite(Number(updated.saldo))) gameState.saldo = Number(updated.saldo);
+        renderUserStats(updated);
+      }
     }catch(error){
-      showMsg(error?.message || 'No se pudo guardar la partida segura.', 'danger');
+      if(shouldUseLocalSoloFallback(error)){
+        try{
+          await finishSoloLocalFallback({ tiempoMs, premioRanking });
+          gameState.soloSessionId = null;
+        }catch(fallbackError){
+          showMsg(fallbackError?.message || 'No se pudo guardar la partida.', 'danger');
+        }
+      }else{
+        showMsg(error?.message || 'No se pudo guardar la partida segura.', 'danger');
+      }
     }
   }
   updateStats();

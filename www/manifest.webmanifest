@@ -1,7 +1,7 @@
 {
   "name": "MemoraBet Casino",
   "short_name": "MemoraBet",
-  "description": "Juego de memoria con saldo ficticio, tienda, perfil y ranking.",
+  "description": "Juego de memoria con saldo ficticio, sin dinero real ni premios reales.",
   "lang": "es",
   "start_url": "./index.html",
   "scope": "./",

@@ -5,7 +5,8 @@ import {
   onAuthStateChanged,
   deleteUser,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInWithCredential
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 import { auth } from './firebase-config.js?v=72';
@@ -36,6 +37,7 @@ import {
   resetCardSkinDisplay
 } from './ui.js?v=95';
 import { t } from './i18n.js?v=1';
+import { deleteAccountServer } from './cloud-functions.js?v=1';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -82,6 +84,31 @@ function mapAuthError(error){
     'auth/unauthorized-domain':'Este dominio no esta autorizado en Firebase. Agrega 127.0.0.1, localhost y la IP del computador en Authentication > Settings > Authorized domains.'
   };
   return map[error.code] || `Error: ${error.message}`;
+}
+
+function getNativeFirebaseAuth(){
+  return window.Capacitor?.Plugins?.FirebaseAuthentication || null;
+}
+
+function isNativeApp(){
+  return !!window.Capacitor?.isNativePlatform?.();
+}
+
+async function signInWithNativeGoogle(){
+  const nativeAuth = getNativeFirebaseAuth();
+  if(!nativeAuth?.signInWithGoogle){
+    throw new Error('Google nativo no esta disponible en esta build. Reinstala el APK actualizado.');
+  }
+  const nativeResult = await nativeAuth.signInWithGoogle({ skipNativeAuth:true });
+  const nativeCredential = nativeResult?.credential || {};
+  if(!nativeCredential.idToken && !nativeCredential.accessToken){
+    throw new Error('Google no devolvio credenciales. Elige una cuenta Google e intenta nuevamente.');
+  }
+  const credential = GoogleAuthProvider.credential(
+    nativeCredential.idToken || null,
+    nativeCredential.accessToken || null
+  );
+  return signInWithCredential(auth, credential);
 }
 
 export function setAuthMode(mode){
@@ -131,6 +158,7 @@ function showSettingsStatus(text, type='info'){
 function updateSettingsAccountUI(){
   const status = document.getElementById('settings-account-status');
   const logout = document.getElementById('btn-logout-account');
+  const deleteAccount = document.getElementById('btn-delete-account');
   const google = document.getElementById('btn-google-account');
   const register = document.getElementById('btn-email-register');
   const login = document.getElementById('btn-email-login');
@@ -142,6 +170,7 @@ function updateSettingsAccountUI(){
     else status.textContent = t(session.currentUser?.isGuest ? 'settings.guestLinkedStatus' : 'settings.guestStatus');
   }
   if(logout) logout.style.display = hasAccount ? 'block' : 'none';
+  if(deleteAccount) deleteAccount.style.display = hasAccount ? 'block' : 'none';
   if(google) google.textContent = hasAccount ? t('settings.googleChange') : t('settings.googleLink');
   if(register) register.style.display = hasAccount ? 'none' : 'block';
   if(login) login.style.display = hasAccount ? 'none' : 'block';
@@ -222,7 +251,9 @@ export async function handleGoogleAccount(){
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt:'select_account' });
     session.registering = true;
-    const result = await signInWithPopup(auth, provider);
+    const result = isNativeApp()
+      ? await signInWithNativeGoogle()
+      : await signInWithPopup(auth, provider);
     const profile = await ensureGoogleProfile(result.user);
     session.isGuestMode = false;
     session.currentUser = {
@@ -274,6 +305,33 @@ export function initAccountSettings(){
     setSettingsVisible(false);
     await logoutUser();
   });
+  document.getElementById('btn-delete-account')?.addEventListener('click', deleteCurrentAccount);
+}
+
+async function deleteCurrentAccount(){
+  if(!auth.currentUser || session.currentUser?.isGuest){
+    showSettingsStatus('Inicia sesion para eliminar una cuenta.', 'danger');
+    return;
+  }
+  const ok = window.confirm('Esto eliminara tu cuenta MemoraBet, saldo ficticio, historial, rankings y perfil. Esta accion no se puede deshacer. ¿Continuar?');
+  if(!ok) return;
+
+  showSettingsStatus('Eliminando cuenta...', 'info');
+  try{
+    await deleteAccountServer();
+    session.currentUser = null;
+    session.isGuestMode = false;
+    setSettingsVisible(false);
+    resetLoggedOutUI();
+    await enterGuestMode({ silent:true });
+    showMsg('Cuenta eliminada correctamente.', 'success');
+  }catch(error){
+    const code = String(error?.code || '');
+    const message = code.includes('unauthenticated')
+      ? 'Tu sesion expiro. Inicia sesion nuevamente e intenta eliminar la cuenta otra vez.'
+      : (error?.message || 'No se pudo eliminar la cuenta. Intenta nuevamente.');
+    showSettingsStatus(message, 'danger');
+  }
 }
 
 export async function handleAuthSubmit(){

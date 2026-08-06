@@ -1,5 +1,5 @@
 import { ANIMAL_CARDS, K_MAX, TOTAL_PAIRS, G, C, ONLINE_WAGERS, ONLINE_WIN_CUPS, ONLINE_LOSE_CUPS } from './constants.js?v=72';
-import { createLocalDuelState, gameState, session } from './state.js?v=72';
+import { createLocalDuelState, gameState, session } from './state.js?v=73';
 import { shuffle, wait, formatMoney } from './utils.js?v=71';
 import {
   updateSaldo,
@@ -7,6 +7,7 @@ import {
   addLiveHistory,
   updateUserStats,
   addLeaderboardEntry,
+  getUserProfile,
   findWaitingOnlineRoom,
   createOnlineRoom,
   joinOnlineRoom,
@@ -14,10 +15,11 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=77';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, formatDuration, getSelectedAvatar } from './ui.js?v=93';
+} from './database.js?v=78';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=95';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=1';
+import { cancelSoloGameServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=1';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -28,16 +30,89 @@ let onlineRoomUnsubscribe = null;
 let activeOnlineRoom = null;
 let onlineStartTimer = null;
 let onlineClickPending = false;
+let onlineStartShuffleKey = null;
 let lastOnlineRoomStatus = null;
+let lastSuddenDeathNoticeKey = null;
 let handledOnlineFinishId = null;
 let appliedOnlineEconomyRoomId = null;
+const LOCAL_SOLO_SESSION_ID = 'local-fallback';
+
+const VISIBLE_SHUFFLE_SWAPS = [
+  [0, 5], [3, 10], [12, 7], [15, 2],
+  [1, 8], [6, 14], [4, 11], [9, 13],
+  [5, 10], [2, 7], [0, 12], [3, 15]
+];
 
 function isGuestUser(){
   return !!session.currentUser?.isGuest;
 }
 
+function shouldUseLocalSoloFallback(error){
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return code.includes('internal')
+    || code.includes('unavailable')
+    || code.includes('not-found')
+    || message === 'internal'
+    || message.includes('internal')
+    || message.includes('app check')
+    || message.includes('function')
+    || message.includes('network');
+}
+
+async function startSoloLocalFallback(){
+  const uid = session.currentUser?.uid;
+  if(!uid) throw new Error('Inicia sesion nuevamente para jugar.');
+  gameState.soloSessionId = LOCAL_SOLO_SESSION_ID;
+  gameState.saldo -= C;
+  await updateSaldo(uid, gameState.saldo);
+  showMsg('Modo Android de prueba: partida iniciada con Firebase local.', 'warning');
+}
+
+async function finishSoloLocalFallback({ tiempoMs, premioRanking }){
+  const uid = session.currentUser?.uid;
+  if(!uid) return;
+  const user = session.currentUser?.nickname || 'Jugador';
+  const avatar = getSelectedAvatar();
+  const updated = await updateUserStats(uid, {
+    pares: gameState.matched,
+    net: gameState.gananciaPartida,
+    saldo: gameState.saldo
+  });
+  await addLiveHistory({
+    uid,
+    user,
+    pares: gameState.matched,
+    intentos: gameState.intentos,
+    net: gameState.gananciaPartida,
+    avatar
+  });
+  if(gameState.matched === TOTAL_PAIRS){
+    await addLeaderboardEntry({
+      uid,
+      user,
+      tiempoMs,
+      intentos: gameState.intentos,
+      pares: gameState.matched,
+      premio: premioRanking,
+      avatar
+    });
+  }
+  renderUserStats(updated);
+}
+
 function isOnlineDuelActive(){
   return !!gameState.onlineRoom?.id;
+}
+
+function showSuddenDeathNotice(key, subtitle = 'Empate en el mejor de 3. Ahora gana quien resista el fallo.'){
+  if(lastSuddenDeathNoticeKey === key) return;
+  lastSuddenDeathNoticeKey = key;
+  return showSuddenDeathBanner({
+    title:'MUERTE SUBITA',
+    subtitle,
+    autoCloseMs:2300
+  });
 }
 
 function getCurrentPlayerIndex(room = activeOnlineRoom){
@@ -109,37 +184,7 @@ function getOnlineWinner(room){
 async function settleOnlineEconomy(room){
   const freshRoom = await getOnlineRoom(room.id);
   if(!freshRoom || freshRoom.economySettled || freshRoom.status !== 'finished') return null;
-
-  const winner = getOnlineWinner(freshRoom);
-  const players = listFromFirebase(freshRoom.players).slice(0, 2);
-  const loser = players.find(player => player.uid && player.uid !== winner.uid);
-  if(!winner?.uid || !loser?.uid) return null;
-
-  const wager = normalizeOnlineWager(freshRoom.wager);
-  const pot = Number(freshRoom.pot || wager * players.length || wager * 2);
-  const winnerCups = randomInt(ONLINE_WIN_CUPS.min, ONLINE_WIN_CUPS.max);
-  const loserCups = randomInt(ONLINE_LOSE_CUPS.min, ONLINE_LOSE_CUPS.max);
-  const awardType = freshRoom.mode === 'memory' ? 'cup' : 'medal';
-  const cupType = awardType === 'cup' ? 'gold' : 'silver';
-  const economyRewards = {
-    pot,
-    wager,
-    awardType,
-    cupType,
-    winnerUid:winner.uid,
-    winnerName:winner.name || freshRoom.winnerName || 'Jugador',
-    winnerCups,
-    loserUid:loser.uid,
-    loserName:loser.name || 'Jugador',
-    loserCups
-  };
-
-  await updateOnlineRoom(freshRoom.id, {
-    economySettled:true,
-    economyRewards
-  });
-
-  return economyRewards;
+  return settleOnlineRoomServer(freshRoom.id);
 }
 
 async function applyOnlineEconomyForCurrentUser(room){
@@ -147,28 +192,9 @@ async function applyOnlineEconomyForCurrentUser(room){
   const uid = session.currentUser?.uid;
   if(!uid || isGuestUser()) return;
 
-  const rewards = room.economyRewards;
-  const awardType = rewards.awardType || (rewards.cupType === 'gold' ? 'cup' : 'medal');
-  const cupType = rewards.cupType || (awardType === 'cup' ? 'gold' : 'silver');
-  let result = null;
-
-  if(rewards.winnerUid === uid){
-    result = await applyOnlineResult(uid, {
-      saldoDelta:Number(rewards.pot || room.pot || 0),
-      trophiesDelta:Number(rewards.winnerCups || 0),
-      awardType,
-      cupType
-    });
-  }else if(rewards.loserUid === uid){
-    result = await applyOnlineResult(uid, {
-      trophiesDelta:-Number(rewards.loserCups || 0),
-      awardType,
-      cupType
-    });
-  }
-
   appliedOnlineEconomyRoomId = room.id;
-  if(result) syncCurrentUserEconomy(result);
+  const freshProfile = await getUserProfile(uid);
+  if(freshProfile) syncCurrentUserEconomy(freshProfile);
 }
 
 function resetOnlineClientToLobby(message = t('online.finished')){
@@ -182,6 +208,7 @@ function resetOnlineClientToLobby(message = t('online.finished')){
   gameState.intentos = 0;
   gameState.round = 1;
   gameState.gananciaPartida = 0;
+  gameState.soloSessionId = null;
   gameState.onlineWager = 0;
   gameState.onlinePot = 0;
   gameState.startTime = 0;
@@ -268,6 +295,7 @@ function resetLocalRoundScores(){
 }
 
 function startFreshLocalMatch(mode = 'classic'){
+  lastSuddenDeathNoticeKey = null;
   gameState.localDuel.active = true;
   gameState.localDuel.mode = mode;
   gameState.localDuel.current = 0;
@@ -302,6 +330,22 @@ function buildOnlineDeck({ flipped = true } = {}){
   }));
 }
 
+function applyVisibleShuffleOrder(cards, { resetMatched = true } = {}){
+  const next = cards.map(card => ({ ...card }));
+  for(const [a, b] of VISIBLE_SHUFFLE_SWAPS){
+    if(!next[a] || !next[b]) continue;
+    const tmp = next[a];
+    next[a] = next[b];
+    next[b] = tmp;
+  }
+  return next.map((card, i) => ({
+    ...card,
+    id:i,
+    flipped:false,
+    matched:resetMatched ? false : card.matched
+  }));
+}
+
 function getOnlineTurnText(room){
   const player = listFromFirebase(room.players)[room.current];
   return room.statusText || (player ? `Turno de ${player.name}` : 'Esperando rival online...');
@@ -316,6 +360,8 @@ async function cleanupOnlineRoom({ removeRoom = false, silent = false } = {}){
   const roomId = activeOnlineRoom?.id || gameState.onlineRoom?.id;
   clearOnlineTimer();
   onlineClickPending = false;
+  onlineStartShuffleKey = null;
+  lastSuddenDeathNoticeKey = null;
   lastOnlineRoomStatus = null;
   if(onlineRoomUnsubscribe){
     onlineRoomUnsubscribe();
@@ -373,7 +419,7 @@ async function startOnlinePlaying(room){
   room = freshRoom;
   let cards = listFromFirebase(room.cards).map(card => ({ ...card, flipped:false, matched:false }));
   if(room.mode === 'classic'){
-    cards = shuffle(cards).map((card, i) => ({ ...card, id:i }));
+    cards = applyVisibleShuffleOrder(cards);
   }
   const players = listFromFirebase(room.players).slice(0, 2).map(player => ({ ...player, score:0 }));
   await updateOnlineRoom(room.id, {
@@ -402,8 +448,43 @@ function scheduleOnlineHostStep(room){
   }
 }
 
+function beginOnlineStartShuffle(room, finalCards){
+  const key = `${room.id}:${room.startedAt || room.updatedAt || 'playing'}`;
+  if(onlineStartShuffleKey === key) return true;
+  onlineStartShuffleKey = key;
+
+  const token = gameState.gameToken;
+  gameState.cards = gameState.cards.map(card => ({
+    ...card,
+    flipped:false,
+    matched:false
+  }));
+  gameState.flipped = [];
+  gameState.matched = 0;
+  gameState.intentos = 0;
+  gameState.starting = true;
+  gameState.playing = false;
+  gameState.blocked = true;
+  gameState.localDuel.statusText = t('msg.shuffling');
+  setNewGameButtonBusy(true);
+  updateCardClasses();
+  updateStats();
+
+  (async () => {
+    await wait(650);
+    if(token !== gameState.gameToken || activeOnlineRoom?.id !== room.id) return;
+    const shuffled = await animateShuffle(.9, true, token);
+    if(!shuffled || token !== gameState.gameToken || activeOnlineRoom?.id !== room.id) return;
+    gameState.cards = finalCards;
+    applyOnlineRoom(room);
+  })();
+
+  return true;
+}
+
 function applyOnlineRoom(room){
   const previousStatus = lastOnlineRoomStatus;
+  const previousRoom = activeOnlineRoom;
   activeOnlineRoom = room;
   setNewGameButtonBusy(false);
   if(!room){
@@ -413,6 +494,7 @@ function applyOnlineRoom(room){
     activeOnlineRoom = null;
     gameState.onlineRoom = null;
     gameState.localDuel = createLocalDuelState();
+    onlineStartShuffleKey = null;
     gameState.playing = false;
     gameState.blocked = false;
     gameState.starting = false;
@@ -422,6 +504,7 @@ function applyOnlineRoom(room){
     gameState.onlineWager = 0;
     gameState.onlinePot = 0;
     lastOnlineRoomStatus = null;
+    lastSuddenDeathNoticeKey = null;
     clearBoard();
     updateStats();
     showMsg(t('online.closed'), 'warning');
@@ -479,8 +562,22 @@ function applyOnlineRoom(room){
   while(gameState.localDuel.players.length < 2){
     gameState.localDuel.players.push({ name:`Jugador ${gameState.localDuel.players.length + 1}`, avatar:'', score:0 });
   }
+  if(room.mode === 'classic' && room.suddenDeath && !previousRoom?.suddenDeath){
+    showSuddenDeathNotice(`online-sudden-death:${room.id}`, 'Empate online. Ahora gana quien defienda mejor en muerte subita.');
+  }
 
-  gameState.cards = listFromFirebase(room.cards);
+  const roomCards = listFromFirebase(room.cards);
+  const shouldAnimateOnlineClassicShuffle = previousStatus === 'preview'
+    && room.status === 'playing'
+    && room.mode === 'classic'
+    && gameState.cards.length === roomCards.length
+    && roomCards.length > 0;
+  if(shouldAnimateOnlineClassicShuffle && beginOnlineStartShuffle(room, roomCards)){
+    scheduleOnlineHostStep(room);
+    return;
+  }
+
+  gameState.cards = roomCards;
   gameState.flipped = listFromFirebase(room.flipped);
   gameState.matched = Number(room.matched || 0);
   gameState.intentos = Number(room.intentos || 0);
@@ -1032,14 +1129,8 @@ async function animateShuffle(speed = 1, resetMatched = true, token = gameState.
 
   // Barajado visible: son pocos intercambios, lentos y reales.
   // El jugador puede seguir algunas cartas con la vista, no como casino turbio de caricatura.
-  const visibleSwaps = [
-    [0, 5], [3, 10], [12, 7], [15, 2],
-    [1, 8], [6, 14], [4, 11], [9, 13],
-    [5, 10], [2, 7], [0, 12], [3, 15]
-  ];
-
   try{
-    for(const [a, b] of visibleSwaps){
+    for(const [a, b] of VISIBLE_SHUFFLE_SWAPS){
       if(token !== gameState.gameToken) return false;
       const moved = await animateVisibleSwap(a, b, speed, token);
       if(!moved || token !== gameState.gameToken) return false;
@@ -1078,6 +1169,7 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   gameState.flipped = [];
   gameState.startTime = 0;
   gameState.endTime = 0;
+  const token = gameState.gameToken;
   if(localDuel){
     const preserveDuelMatch = gameState.localDuel.active
       && gameState.localDuel.mode === localDuelMode
@@ -1100,6 +1192,22 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   }
   setNewGameButtonBusy(true);
 
+  if(localDuel && localDuelMode === 'classic' && gameState.localDuel.suddenDeath){
+    gameState.blocked = true;
+    gameState.localDuel.statusText = 'Muerte subita';
+    updateStats();
+    await showSuddenDeathNotice(
+      `local-sudden-round:${gameState.localDuel.round}:${gameState.localDuel.suddenDeathStep}`,
+      'Muerte subita activada. Memoriza las cartas y defiende tu turno.'
+    );
+    if(token !== gameState.gameToken){
+      gameState.starting = false;
+      gameState.blocked = false;
+      setNewGameButtonBusy(false);
+      return;
+    }
+  }
+
   if(!localDuel && !session.currentUser){
     gameState.starting = false;
     setNewGameButtonBusy(false);
@@ -1113,7 +1221,6 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
     return;
   }
 
-  const token = gameState.gameToken;
   const deck = shuffle([...ANIMAL_CARDS, ...ANIMAL_CARDS]);
   gameState.playing = false;
   gameState.cards = deck.map((animal,i)=>({
@@ -1128,11 +1235,38 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   gameState.matched = 0;
   gameState.intentos = 0;
   gameState.gananciaPartida = localDuel ? 0 : -C;
+  gameState.soloSessionId = null;
   gameState.blocked = true;
   if(!localDuel){
-    gameState.saldo -= C;
-    if(isGuestUser()) saveGuestBalance();
-    else await updateSaldo(session.currentUser.uid, gameState.saldo);
+    if(isGuestUser()){
+      gameState.saldo -= C;
+      saveGuestBalance();
+    }else{
+      try{
+        const started = await startSoloGameServer();
+        gameState.soloSessionId = started.sessionId || null;
+        gameState.saldo = Number(started.saldo ?? (gameState.saldo - C));
+      }catch(error){
+        if(shouldUseLocalSoloFallback(error)){
+          console.warn('MemoraBet secure start fallback:', error);
+          try{
+            await startSoloLocalFallback();
+          }catch(fallbackError){
+            gameState.starting = false;
+            gameState.blocked = false;
+            setNewGameButtonBusy(false);
+            showMsg(fallbackError?.message || 'No se pudo iniciar la partida.', 'danger');
+            return;
+          }
+        }else{
+          gameState.starting = false;
+          gameState.blocked = false;
+          setNewGameButtonBusy(false);
+          showMsg(error?.message || 'No se pudo iniciar la partida segura.', 'danger');
+          return;
+        }
+      }
+    }
   }
   if(token !== gameState.gameToken){
     gameState.starting = false;
@@ -1168,8 +1302,13 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   if(localDuel && localDuelMode === 'memory'){
     gameState.localDuel.statusText = `Turno de ${currentLocalPlayer().name}`;
   }else{
-    if(localDuel) hideMsg();
-    else showMsg(t('msg.shuffling'), 'warning');
+    if(localDuel){
+      gameState.localDuel.statusText = t('msg.shuffling');
+      updateStats();
+      hideMsg();
+    }else{
+      showMsg(t('msg.shuffling'), 'warning');
+    }
     const shuffled = await animateShuffle(.9, true, token);
     if(!shuffled || token !== gameState.gameToken){
       gameState.starting = false;
@@ -1195,6 +1334,9 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
   gameState.startTime = Date.now();
   setNewGameButtonBusy(false);
   renderBoard(flipCard);
+  if(localDuel && gameState.localDuel.statusText === t('msg.shuffling')){
+    gameState.localDuel.statusText = '';
+  }
   updateStats();
   if(localDuel) hideMsg();
   else showMsg(t('msg.play'), 'success');
@@ -1315,7 +1457,6 @@ export function flipCard(id){
           gameState.gananciaPartida += G;
           gameState.saldo += G;
           if(isGuestUser()) saveGuestBalance();
-          else await updateSaldo(session.currentUser.uid, gameState.saldo);
         }
         gameState.flipped = [];
         gameState.blocked = false;
@@ -1410,17 +1551,6 @@ export async function endGame(){
     const guestNote = isGuestUser() ? t('msg.guestRank') : '';
     showMsg(t('msg.completed', { time:formatDuration(tiempoMs), tries:gameState.intentos, prize:formatMoney(premioRanking), guestNote }), 'success');
     showVictoryAnimation({ tiempoMs, intentos: gameState.intentos, premio: premioRanking });
-    if(!isGuestUser()){
-      await addLeaderboardEntry({
-        uid: session.currentUser.uid,
-        user: session.currentUser.nickname,
-        tiempoMs,
-        intentos: gameState.intentos,
-        pares: gameState.matched,
-        premio: premioRanking,
-        avatar
-      });
-    }
   }else{
     showMsg(t('msg.finished', {
       matched:gameState.matched,
@@ -1434,20 +1564,35 @@ export async function endGame(){
     saveGuestBalance();
     updateGuestStats({ pares: gameState.matched, net });
   }else{
-    await addLiveHistory({
-      uid: session.currentUser.uid,
-      user: session.currentUser.nickname,
-      pares: gameState.matched,
-      intentos: gameState.intentos,
-      net,
-      avatar
-    });
-    const updated = await updateUserStats(session.currentUser.uid, {
-      pares: gameState.matched,
-      net,
-      saldo: gameState.saldo
-    });
-    renderUserStats(updated);
+    try{
+      let updated = null;
+      if(gameState.soloSessionId === LOCAL_SOLO_SESSION_ID){
+        await finishSoloLocalFallback({ tiempoMs, premioRanking });
+      }else{
+        updated = await finishSoloGameServer({
+          sessionId: gameState.soloSessionId,
+          pares: gameState.matched,
+          intentos: gameState.intentos,
+          tiempoMs
+        });
+      }
+      gameState.soloSessionId = null;
+      if(updated){
+        if(Number.isFinite(Number(updated.saldo))) gameState.saldo = Number(updated.saldo);
+        renderUserStats(updated);
+      }
+    }catch(error){
+      if(shouldUseLocalSoloFallback(error)){
+        try{
+          await finishSoloLocalFallback({ tiempoMs, premioRanking });
+          gameState.soloSessionId = null;
+        }catch(fallbackError){
+          showMsg(fallbackError?.message || 'No se pudo guardar la partida.', 'danger');
+        }
+      }else{
+        showMsg(error?.message || 'No se pudo guardar la partida segura.', 'danger');
+      }
+    }
   }
   updateStats();
 }
@@ -1511,6 +1656,11 @@ export async function resetGame(){
   gameState.intentos = 0;
   gameState.round = 1;
   gameState.gananciaPartida = 0;
+  if(gameState.soloSessionId && !isGuestUser()){
+    const cancelled = await cancelSoloGameServer(gameState.soloSessionId).catch(() => null);
+    if(Number.isFinite(Number(cancelled?.saldo))) gameState.saldo = Number(cancelled.saldo);
+  }
+  gameState.soloSessionId = null;
   gameState.onlineWager = 0;
   gameState.onlinePot = 0;
   gameState.startTime = 0;
@@ -1546,6 +1696,11 @@ export async function exitGame(){
     && gameState.matched === 0
     && gameState.intentos === 0;
   const previousSaldo = shouldRefundEntry ? gameState.saldo + C : gameState.saldo;
+  let secureSaldo = previousSaldo;
+  if(gameState.soloSessionId && !isGuestUser()){
+    const cancelled = await cancelSoloGameServer(gameState.soloSessionId).catch(() => null);
+    if(Number.isFinite(Number(cancelled?.saldo))) secureSaldo = Number(cancelled.saldo);
+  }
   gameState.gameToken++;
   gameState.playing = false;
   gameState.blocked = false;
@@ -1560,13 +1715,11 @@ export async function exitGame(){
   gameState.onlinePot = 0;
   gameState.startTime = 0;
   gameState.endTime = 0;
-  gameState.saldo = previousSaldo;
+  gameState.saldo = secureSaldo;
+  gameState.soloSessionId = null;
   gameState.localDuel = createLocalDuelState();
   if(shouldRefundEntry){
     if(isGuestUser()) saveGuestBalance();
-    else if(session.currentUser){
-      setTimeout(() => updateSaldo(session.currentUser.uid, previousSaldo).catch(() => {}), 1200);
-    }
   }
   setNewGameButtonBusy(false);
   clearBoard();

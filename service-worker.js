@@ -1,8 +1,10 @@
-const CACHE_NAME = 'memorabet-web-v109';
+const CACHE_NAME = 'memorabet-web-v110';
 
 const LOCAL_ASSETS = [
   './',
   './index.html',
+  './privacidad.html',
+  './eliminar-cuenta.html',
   './style.css',
   './main.js',
   './auth.js',

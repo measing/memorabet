@@ -381,7 +381,10 @@ export function updateStats(){
         const baseTurn = duel.suddenDeath
           ? t('duel.suddenTurn', { name:activePlayer.name })
           : t('duel.turn', { name:activePlayer.name });
-        const turnText = duel.statusText || (roundActive
+        const statusPrefix = duel.suddenDeath && duel.statusText && !String(duel.statusText).toLowerCase().includes('muerte')
+          ? `MUERTE SUBITA - ${duel.statusText}`
+          : duel.statusText;
+        const turnText = statusPrefix || (roundActive
           ? (duel.mode === 'memory' ? `${baseTurn} · ${t('duel.firstToEight')}` : `${baseTurn} · ${t('duel.rounds', { a:wins[0], b:wins[1] })}`)
           : '');
         duelTurn.textContent = turnText;
@@ -531,6 +534,39 @@ export function showOnlineVictoryAnimation({ winnerName = t('common.player'), re
   document.getElementById('victory-close')?.addEventListener('click', () => overlay.remove());
   setTimeout(() => overlay.classList.add('show'), 20);
   if(autoCloseMs > 0) setTimeout(() => overlay.remove(), autoCloseMs);
+}
+
+export function showSuddenDeathBanner({
+  title = 'MUERTE SUBITA',
+  subtitle = 'Empate en el mejor de 3. Ahora gana quien resista el fallo.',
+  autoCloseMs = 2600,
+  imageSrc = 'assets/sudden-death.png'
+} = {}){
+  const old = document.getElementById('sudden-death-banner');
+  if(old) old.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'sudden-death-banner';
+  banner.className = 'sudden-death-banner';
+  banner.innerHTML = `
+    <div class="sudden-death-box">
+      <img class="sudden-death-image" src="${escapeHTML(imageSrc)}" alt="${escapeHTML(title)}" />
+      <span>DESEMPATE</span>
+      <h2>${escapeHTML(title)}</h2>
+      <p>${escapeHTML(subtitle)}</p>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(() => banner.classList.add('show'), 20);
+  return new Promise(resolve => {
+    const close = () => {
+      banner.classList.remove('show');
+      setTimeout(() => {
+        banner.remove();
+        resolve();
+      }, 240);
+    };
+    if(autoCloseMs > 0) setTimeout(close, autoCloseMs);
+  });
 }
 
 export function renderLeaderboard(ranking = session.cachedLeaderboard){

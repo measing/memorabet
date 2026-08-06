@@ -41,6 +41,7 @@ export const gameState = {
   round:1,
   saldo:INITIAL_SALDO,
   gananciaPartida:0,
+  soloSessionId:null,
   onlineWager:0,
   onlinePot:0,
   blocked:false,
@@ -61,6 +62,7 @@ export function resetGameState(){
   gameState.round = 1;
   gameState.saldo = INITIAL_SALDO;
   gameState.gananciaPartida = 0;
+  gameState.soloSessionId = null;
   gameState.onlineWager = 0;
   gameState.onlinePot = 0;
   gameState.blocked = false;

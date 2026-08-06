@@ -99,6 +99,50 @@ async function applyOnlineResult(uid, { saldoDelta = 0, trophiesDelta = 0, award
   return nextProfile;
 }
 
+async function removeUserHistory(uid){
+  const historyPaths = ['historial', 'liveHistory'];
+  for(const path of historyPaths){
+    const snap = await db.ref(path).orderByChild('uid').equalTo(uid).get();
+    const updates = {};
+    snap.forEach(child => {
+      updates[child.key] = null;
+    });
+    if(Object.keys(updates).length) await db.ref(path).update(updates);
+  }
+}
+
+exports.deleteAccount = onCall(async request => {
+  const uid = requireAuth(request);
+  const profile = await getProfile(uid);
+  const cleanNickname = String(profile.cleanNickname || '').trim();
+
+  const deletes = [
+    db.ref(`users/${uid}`).remove(),
+    db.ref(`gameSessions/${uid}`).remove(),
+    db.ref(`ranking/${uid}`).remove(),
+    db.ref(`leaderboard/${uid}`).remove(),
+    db.ref(`rankingMedals/${uid}`).remove(),
+    db.ref(`rankingCups/${uid}`).remove()
+  ];
+  if(cleanNickname) deletes.push(db.ref(`nicknames/${cleanNickname}`).remove());
+
+  await Promise.all(deletes);
+  await removeUserHistory(uid);
+
+  const roomsSnap = await db.ref('onlineRooms').get();
+  const roomUpdates = {};
+  roomsSnap.forEach(roomSnap => {
+    const room = roomSnap.val() || {};
+    if(room.hostUid === uid || room.players?.[uid]){
+      roomUpdates[roomSnap.key] = null;
+    }
+  });
+  if(Object.keys(roomUpdates).length) await db.ref('onlineRooms').update(roomUpdates);
+
+  await admin.auth().deleteUser(uid);
+  return { ok:true };
+});
+
 exports.startSoloGame = onCall({ enforceAppCheck:true }, async request => {
   assertAppCheck(request);
   const uid = requireAuth(request);

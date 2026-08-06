@@ -1,0 +1,16 @@
+node_modules/
+functions/node_modules/
+.idea/
+
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/key.properties
+
+*.apk
+*.aab
+*.jks
+*.keystore
+firebase-debug.log
+firebase-debug.*.log

@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "39967822156",
+    "firebase_url": "https://memorabet-77fea-default-rtdb.firebaseio.com",
+    "project_id": "memorabet-77fea",
+    "storage_bucket": "memorabet-77fea.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:39967822156:android:b9b20ae73dba22a2f73fe9",
+        "android_client_info": {
+          "package_name": "com.memorabet.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "39967822156-2afh5utst5tr10r575k62ai2f9vsehst.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqvRrD5dHwRnKK3KVvWhCu7jAJzmVGaOg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "39967822156-2afh5utst5tr10r575k62ai2f9vsehst.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
