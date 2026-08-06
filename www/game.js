@@ -13,6 +13,7 @@ import {
   createOnlineRoom,
   joinOnlineRoom,
   listenOnlineRoom,
+  registerOnlineRoomDisconnect,
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
@@ -38,6 +39,8 @@ let lastSuddenDeathNoticeKey = null;
 let handledOnlineFinishId = null;
 let appliedOnlineEconomyRoomId = null;
 let settlingOnlineEconomyRoomId = null;
+let onlineDisconnectCancel = null;
+let onlineDisconnectKey = null;
 const LOCAL_SOLO_SESSION_ID = 'local-fallback';
 const ONLINE_TURN_DURATION_MS = 10000;
 const COIN_GIFT_AMOUNT = 1000;
@@ -205,6 +208,46 @@ function requestOnlineEconomySettlement(room){
   });
 }
 
+function cancelOnlineDisconnectHandler(){
+  if(onlineDisconnectCancel){
+    onlineDisconnectCancel();
+    onlineDisconnectCancel = null;
+  }
+  onlineDisconnectKey = null;
+}
+
+function syncOnlineDisconnectHandler(room){
+  if(!room || room.status === 'finished'){
+    cancelOnlineDisconnectHandler();
+    return;
+  }
+
+  const myUid = session.currentUser?.uid;
+  const players = listFromFirebase(room.players);
+  const me = players.find(player => player.uid === myUid);
+  const opponent = players.find(player => player.uid && player.uid !== myUid);
+  if(!me || !opponent){
+    cancelOnlineDisconnectHandler();
+    return;
+  }
+
+  const key = `${room.id}:${myUid}:${opponent.uid}:${room.status}`;
+  if(onlineDisconnectKey === key) return;
+  cancelOnlineDisconnectHandler();
+  onlineDisconnectKey = key;
+  onlineDisconnectCancel = registerOnlineRoomDisconnect(room.id, {
+    status:'finished',
+    resolving:false,
+    matchOver:true,
+    turnStartedAt:0,
+    turnDeadlineAt:0,
+    winnerUid:opponent.uid,
+    winnerName:opponent.name || t('common.player'),
+    concededBy:myUid || '',
+    statusText:`${opponent.name || t('common.player')} gana por abandono`
+  });
+}
+
 async function applyOnlineEconomyForCurrentUser(room){
   if(!room?.economySettled || !room.economyRewards || appliedOnlineEconomyRoomId === room.id) return;
   const uid = session.currentUser?.uid;
@@ -236,11 +279,13 @@ function resetOnlineClientToLobby(message = t('online.finished')){
   activeOnlineRoom = null;
   clearOnlineTimer();
   clearOnlineTurnTimer();
+  cancelOnlineDisconnectHandler();
   onlineClickPending = false;
   lastOnlineRoomStatus = null;
   handledOnlineFinishId = null;
   appliedOnlineEconomyRoomId = null;
   settlingOnlineEconomyRoomId = null;
+  cancelOnlineDisconnectHandler();
   if(onlineRoomUnsubscribe){
     onlineRoomUnsubscribe();
     onlineRoomUnsubscribe = null;
@@ -611,6 +656,7 @@ function applyOnlineRoom(room){
   setNewGameButtonBusy(false);
   if(!room){
     refundPendingOnlineEntry(null).catch(() => {});
+    cancelOnlineDisconnectHandler();
     clearOnlineTimer();
     onlineClickPending = false;
     activeOnlineRoom = null;
@@ -644,6 +690,7 @@ function applyOnlineRoom(room){
   };
   gameState.onlineWager = Number(room.wager || gameState.onlineWager || 0);
   gameState.onlinePot = Number(room.pot || (gameState.onlineWager * Math.max(1, listFromFirebase(room.players).length)) || 0);
+  syncOnlineDisconnectHandler(room);
   if(room.economySettled && room.economyRewards && appliedOnlineEconomyRoomId !== room.id){
     applyOnlineEconomyForCurrentUser(room).catch(() => {});
   }

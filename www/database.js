@@ -560,6 +560,13 @@ export function listenOnlineRoom(roomId, callback){
   });
 }
 
+export function registerOnlineRoomDisconnect(roomId, patch){
+  if(!roomId) return () => {};
+  const disconnectRef = onDisconnect(ref(db, `onlineRooms/${roomId}`));
+  disconnectRef.update({ ...normalizeRoomPatch(patch), updatedAt: now() }).catch(() => {});
+  return () => disconnectRef.cancel().catch(() => {});
+}
+
 export async function getOnlineRoom(roomId){
   const snap = await get(ref(db, `onlineRooms/${roomId}`));
   return snap.exists() ? { id: roomId, ...snap.val() } : null;
