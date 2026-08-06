@@ -12,9 +12,24 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png" />
   <link rel="apple-touch-icon" href="assets/app-icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=103" />
+  <link rel="stylesheet" href="style.css?v=104" />
 </head>
 <body>
+  <div id="mobile-loading-screen" class="mobile-loading-screen" aria-hidden="true">
+    <div class="mobile-loading-art" aria-hidden="true"></div>
+    <div class="mobile-loading-vignette" aria-hidden="true"></div>
+    <div class="mobile-loading-content">
+      <img src="assets/memorabet-logo.png" alt="MemoraBet" class="mobile-loading-logo" />
+      <div class="mobile-loading-copy">
+        <strong id="mobile-loading-percent">0%</strong>
+        <span id="mobile-loading-text">Barajando cartas...</span>
+      </div>
+      <div class="mobile-loading-bar" aria-hidden="true">
+        <span id="mobile-loading-fill"></span>
+      </div>
+    </div>
+  </div>
+
   <div id="auth-modal" class="nickname-modal" style="display:none">
     <div class="nickname-box auth-box">
       <img src="assets/logo.png" alt="MemoraBet" class="modal-logo" />
@@ -449,6 +464,6 @@
       setTimeout(installFallback, isLocalFile ? 800 : 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=114"></script>
+  <script type="module" src="main.js?v=115"></script>
 </body>
 </html>

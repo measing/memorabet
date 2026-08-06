@@ -9,6 +9,62 @@ import { initFriendsFeature, refreshFriendsFeature } from './friends.js?v=4';
 
 window.__memorabetMainLoaded = true;
 
+function initMobileLoadingScreen(){
+  const screen = document.getElementById('mobile-loading-screen');
+  if(!screen) return;
+
+  const isMobile = matchMedia('(max-width:720px), (hover:none) and (pointer:coarse)').matches;
+  if(!isMobile){
+    screen.classList.add('done');
+    return;
+  }
+
+  const fill = document.getElementById('mobile-loading-fill');
+  const percent = document.getElementById('mobile-loading-percent');
+  const text = document.getElementById('mobile-loading-text');
+  const phrases = [
+    'Barajando cartas...',
+    'Preparando la mesa...',
+    'Cargando suerte...',
+    'Listo para jugar...'
+  ];
+  let progress = 0;
+  let phraseIndex = 0;
+  const startedAt = performance.now();
+  document.body.classList.add('mobile-loading-active');
+
+  const setProgress = value => {
+    progress = Math.max(progress, Math.min(100, value));
+    if(fill) fill.style.width = `${progress}%`;
+    if(percent) percent.textContent = `${Math.round(progress)}%`;
+    const nextPhrase = Math.min(phrases.length - 1, Math.floor(progress / 28));
+    if(text && nextPhrase !== phraseIndex){
+      phraseIndex = nextPhrase;
+      text.textContent = phrases[phraseIndex];
+    }
+  };
+
+  const timer = setInterval(() => {
+    const cap = document.readyState === 'complete' ? 100 : 92;
+    setProgress(Math.min(cap, progress + Math.random() * 9 + 4));
+  }, 160);
+
+  const finish = () => {
+    const waitMs = Math.max(0, 1650 - (performance.now() - startedAt));
+    window.setTimeout(() => {
+      clearInterval(timer);
+      setProgress(100);
+      window.setTimeout(() => {
+        screen.classList.add('done');
+        document.body.classList.remove('mobile-loading-active');
+      }, 320);
+    }, waitMs);
+  };
+
+  if(document.readyState === 'complete') finish();
+  else window.addEventListener('load', finish, { once:true });
+}
+
 function openAuth(mode = 'choice'){
   setAuthMode(mode);
   const modal = document.getElementById('auth-modal');
@@ -85,6 +141,7 @@ function bindEvents(){
   window.addEventListener('memorabet-open-auth', event => openAuth(event.detail?.mode || 'choice'));
 }
 
+initMobileLoadingScreen();
 initMobileAppSupport();
 registerServiceWorker();
 bindEvents();
