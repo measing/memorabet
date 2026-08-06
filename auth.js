@@ -23,7 +23,7 @@ import {
   syncPublicProfile,
   syncPublicAwardRankings,
   makeUniqueNickname
-} from './database.js?v=81';
+} from './database.js?v=82';
 import {
   setAuthModeUI,
   showAuthModal,
@@ -37,7 +37,7 @@ import {
   showRulesModalIfNeeded,
   resetAvatarDisplay,
   resetCardSkinDisplay
-} from './ui.js?v=95';
+} from './ui.js?v=99';
 import { t } from './i18n.js?v=1';
 import { deleteAccountServer } from './cloud-functions.js?v=1';
 

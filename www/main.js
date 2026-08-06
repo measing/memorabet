@@ -1,11 +1,11 @@
-import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=85';
-import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=89';
-import { listenLiveHistory, listenLeaderboard } from './database.js?v=81';
+import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=87';
+import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=91';
+import { listenLiveHistory, listenLeaderboard } from './database.js?v=82';
 import { session } from './state.js?v=73';
-import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=97';
+import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=99';
 import { initAudioControls } from './audio.js?v=73';
 import { initI18n, translatePage } from './i18n.js?v=1';
-import { initFriendsFeature, refreshFriendsFeature } from './friends.js?v=4';
+import { initFriendsFeature, refreshFriendsFeature } from './friends.js?v=5';
 
 window.__memorabetMainLoaded = true;
 

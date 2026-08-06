@@ -3,6 +3,8 @@ import { db } from './firebase-config.js?v=72';
 import { INITIAL_SALDO, avatarPool } from './constants.js?v=71';
 import { normalizeNickname } from './utils.js?v=71';
 
+const LOCAL_HISTORY_KEY = 'memorabetLocalHistory';
+
 function now(){
   return Date.now();
 }
@@ -54,6 +56,28 @@ function sortSoloRanking(items){
       return Number(b.t || 0) - Number(a.t || 0);
     })
     .slice(0, 10);
+}
+
+function readLocalHistory(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(LOCAL_HISTORY_KEY) || '[]');
+    return Array.isArray(saved) ? saved.map((item, index) => normalizePublicEntry(item, `local-${index}`)) : [];
+  }catch{
+    return [];
+  }
+}
+
+function saveLocalHistoryEntry(entry){
+  try{
+    const current = readLocalHistory();
+    const next = [entry, ...current].sort((a,b)=>(b.t||0)-(a.t||0)).slice(0, 12);
+    localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(next));
+    if(typeof window !== 'undefined'){
+      window.dispatchEvent(new CustomEvent('memorabet-local-history-change'));
+    }
+  }catch(error){
+    console.warn('MemoraBet no pudo guardar historial local:', error);
+  }
 }
 
 function listFromFirebase(value){
@@ -312,7 +336,7 @@ export async function updateUserStats(uid, { pares, net, saldo }){
 }
 
 export async function addLiveHistory({ uid, user, pares, intentos, net, avatar }){
-  await push(ref(db, 'historial'), {
+  const entry = {
     uid,
     user:user || 'Jugador',
     pares,
@@ -320,7 +344,13 @@ export async function addLiveHistory({ uid, user, pares, intentos, net, avatar }
     net,
     t: now(),
     avatar: fallbackAvatar(avatar)
-  });
+  };
+  try{
+    await push(ref(db, 'historial'), entry);
+  }catch(error){
+    console.warn('MemoraBet local history fallback:', error);
+    saveLocalHistoryEntry(entry);
+  }
 }
 
 export async function addLeaderboardEntry({ uid, user, tiempoMs, intentos, pares, premio, avatar }){
@@ -399,8 +429,9 @@ export function listenLeaderboard(callback){
 }
 
 export function listenLiveHistory(callback){
-  const state = { current: [], legacy: [] };
+  const state = { current: [], legacy: [], local: readLocalHistory() };
   const emit = () => callback([...state.current, ...state.legacy]
+    .concat(state.local)
     .sort((a,b)=>(b.t||0)-(a.t||0))
     .slice(0, 12));
 
@@ -417,7 +448,18 @@ export function listenLiveHistory(callback){
     emit();
   });
 
+  const syncLocal = () => {
+    state.local = readLocalHistory();
+    emit();
+  };
+  if(typeof window !== 'undefined'){
+    window.addEventListener('memorabet-local-history-change', syncLocal);
+  }
+
   return () => {
+    if(typeof window !== 'undefined'){
+      window.removeEventListener('memorabet-local-history-change', syncLocal);
+    }
     stopCurrent();
     stopLegacy();
   };
