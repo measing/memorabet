@@ -15,8 +15,8 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=82';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=100';
+} from './database.js?v=83';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=1';
 import { cancelSoloGameServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=1';
@@ -31,11 +31,13 @@ let activeOnlineRoom = null;
 let onlineStartTimer = null;
 let onlineClickPending = false;
 let onlineStartShuffleKey = null;
+let onlineTurnTimer = null;
 let lastOnlineRoomStatus = null;
 let lastSuddenDeathNoticeKey = null;
 let handledOnlineFinishId = null;
 let appliedOnlineEconomyRoomId = null;
 const LOCAL_SOLO_SESSION_ID = 'local-fallback';
+const ONLINE_TURN_DURATION_MS = 10000;
 
 const VISIBLE_SHUFFLE_SWAPS = [
   [0, 5], [3, 10], [12, 7], [15, 2],
@@ -219,6 +221,7 @@ function resetOnlineClientToLobby(message = t('online.finished')){
   gameState.onlineRoom = null;
   activeOnlineRoom = null;
   clearOnlineTimer();
+  clearOnlineTurnTimer();
   onlineClickPending = false;
   lastOnlineRoomStatus = null;
   handledOnlineFinishId = null;
@@ -358,9 +361,109 @@ function clearOnlineTimer(){
   onlineStartTimer = null;
 }
 
+function clearOnlineTurnTimer(){
+  if(onlineTurnTimer?.id) clearTimeout(onlineTurnTimer.id);
+  onlineTurnTimer = null;
+}
+
+function getOnlineTurnPatch(durationMs = ONLINE_TURN_DURATION_MS){
+  const startedAt = Date.now();
+  return {
+    turnStartedAt: startedAt,
+    turnDurationMs: durationMs,
+    turnDeadlineAt: startedAt + durationMs
+  };
+}
+
+function getClearedOnlineTurnPatch(){
+  return {
+    turnStartedAt: 0,
+    turnDurationMs: ONLINE_TURN_DURATION_MS,
+    turnDeadlineAt: 0
+  };
+}
+
+async function expireOnlineTurn(roomId, expectedDeadline = 0){
+  const room = await getOnlineRoom(roomId);
+  if(!room || room.status !== 'playing' || room.resolving) return;
+  const deadline = Number(room.turnDeadlineAt || 0);
+  if(!deadline || (expectedDeadline && deadline !== expectedDeadline) || Date.now() < deadline) return;
+
+  const players = listFromFirebase(room.players).map(player => ({ ...player, score:Number(player.score || 0) }));
+  const current = Number(room.current || 0);
+  const nextCurrent = current === 0 ? 1 : 0;
+  const currentName = players[current]?.name || `Jugador ${current + 1}`;
+  const nextName = players[nextCurrent]?.name || `Jugador ${nextCurrent + 1}`;
+  const cards = listFromFirebase(room.cards).map(card => ({ ...card }));
+  cards.forEach(card => {
+    if(!card.matched) card.flipped = false;
+  });
+  let matched = Number(room.matched || 0);
+  const roundWins = listFromFirebase(room.roundWins).length ? [...listFromFirebase(room.roundWins)] : [0, 0];
+  const suddenLead = [0, 1].includes(Number(room.suddenDeathLead)) ? Number(room.suddenDeathLead) : -1;
+
+  if(room.mode === 'classic' && room.suddenDeath && suddenLead >= 0 && suddenLead !== current){
+    roundWins[suddenLead]++;
+    await updateOnlineRoom(roomId, {
+      status:'finished',
+      cards,
+      players,
+      current:suddenLead,
+      flipped:[],
+      matched,
+      resolving:false,
+      matchOver:true,
+      roundWins,
+      winnerUid:players[suddenLead]?.uid || '',
+      winnerName:players[suddenLead]?.name || `Jugador ${suddenLead + 1}`,
+      statusText:`${currentName} se quedo sin tiempo. ${players[suddenLead]?.name || 'Jugador'} gana muerte subita online`,
+      ...getClearedOnlineTurnPatch()
+    });
+    return;
+  }
+
+  if(room.mode === 'memory'){
+    players[current].score = 0;
+    cards.forEach(card => {
+      card.flipped = false;
+      card.matched = false;
+    });
+    matched = 0;
+  }
+
+  await updateOnlineRoom(roomId, {
+    status:'playing',
+    cards,
+    players,
+    current:nextCurrent,
+    flipped:[],
+    matched,
+    resolving:false,
+    matchOver:false,
+    intentos:Number(room.intentos || 0) + 1,
+    suddenDeathStep:room.suddenDeath ? Number(room.suddenDeathStep || 0) + 1 : Number(room.suddenDeathStep || 0),
+    statusText:`${currentName} se quedo sin tiempo. Turno de ${nextName}`,
+    ...getOnlineTurnPatch()
+  });
+}
+
+function scheduleOnlineTurnTimeout(room){
+  clearOnlineTurnTimer();
+  if(!room || room.status !== 'playing' || room.resolving) return;
+  const deadline = Number(room.turnDeadlineAt || 0);
+  if(!deadline) return;
+  const key = `${room.id}:${deadline}:${room.current || 0}`;
+  const waitMs = Math.max(0, deadline - Date.now() + 80);
+  onlineTurnTimer = {
+    key,
+    id:setTimeout(() => expireOnlineTurn(room.id, deadline).catch(() => {}), waitMs)
+  };
+}
+
 async function cleanupOnlineRoom({ removeRoom = false, silent = false } = {}){
   const roomId = activeOnlineRoom?.id || gameState.onlineRoom?.id;
   clearOnlineTimer();
+  clearOnlineTurnTimer();
   onlineClickPending = false;
   onlineStartShuffleKey = null;
   lastSuddenDeathNoticeKey = null;
@@ -410,7 +513,8 @@ async function startOnlinePreview(room){
     current:0,
     players,
     statusText:'Memoricen las cartas...',
-    startedAt:Date.now()
+    startedAt:Date.now(),
+    ...getClearedOnlineTurnPatch()
   });
 }
 
@@ -434,7 +538,8 @@ async function startOnlinePlaying(room){
     players,
     resolving:false,
     statusText:`Turno de ${players[0]?.name || 'Jugador 1'}`,
-    startedAt:Date.now()
+    startedAt:Date.now(),
+    ...getOnlineTurnPatch()
   });
 }
 
@@ -513,7 +618,15 @@ function applyOnlineRoom(room){
     return;
   }
 
-  gameState.onlineRoom = { id:room.id, mode:room.mode, status:room.status };
+  gameState.onlineRoom = {
+    id:room.id,
+    mode:room.mode,
+    status:room.status,
+    current:Number(room.current || 0),
+    resolving:!!room.resolving,
+    turnDeadlineAt:Number(room.turnDeadlineAt || 0),
+    turnDurationMs:Number(room.turnDurationMs || ONLINE_TURN_DURATION_MS)
+  };
   gameState.onlineWager = Number(room.wager || gameState.onlineWager || 0);
   gameState.onlinePot = Number(room.pot || (gameState.onlineWager * Math.max(1, listFromFirebase(room.players).length)) || 0);
   if(room.economySettled && room.economyRewards && appliedOnlineEconomyRoomId !== room.id){
@@ -605,6 +718,7 @@ function applyOnlineRoom(room){
     clearBoard();
   }
   updateStats();
+  scheduleOnlineTurnTimeout(room);
 
   if(room.status === 'waiting') showMsg(t('online.waiting'), 'info');
   else if(room.status === 'ready') showMsg(t('online.ready'), 'success');
@@ -669,7 +783,8 @@ async function resolveOnlinePair(roomId, firstId, secondId){
           roundWins,
           winnerUid:players[winnerIndex]?.uid || '',
           winnerName:players[winnerIndex]?.name || `Jugador ${winnerIndex + 1}`,
-          statusText
+          statusText,
+          ...getClearedOnlineTurnPatch()
         });
         return;
       }
@@ -697,7 +812,8 @@ async function resolveOnlinePair(roomId, firstId, secondId){
         suddenDeath:round >= 3 && roundWins[0] === roundWins[1],
         suddenDeathStep:0,
         suddenDeathLead:-1,
-        statusText
+        statusText,
+        ...getClearedOnlineTurnPatch()
       });
       return;
     }else if(room.mode === 'classic' && room.suddenDeath){
@@ -728,7 +844,8 @@ async function resolveOnlinePair(roomId, firstId, secondId){
           suddenDeath:true,
           suddenDeathStep:Number(room.suddenDeathStep || 0) + 1,
           suddenDeathLead:-1,
-          statusText:'Muerte subita online sin ganador. Otra ronda'
+          statusText:'Muerte subita online sin ganador. Otra ronda',
+          ...getClearedOnlineTurnPatch()
         });
         return;
       }
@@ -745,7 +862,8 @@ async function resolveOnlinePair(roomId, firstId, secondId){
         suddenDeath:true,
         suddenDeathStep:Number(room.suddenDeathStep || 0) + 1,
         suddenDeathLead:nextLead,
-        statusText
+        statusText,
+        ...getOnlineTurnPatch()
       });
       return;
     }else{
@@ -770,7 +888,8 @@ async function resolveOnlinePair(roomId, firstId, secondId){
           suddenDeath:true,
           suddenDeathStep:Number(room.suddenDeathStep || 0) + 1,
           suddenDeathLead:suddenLead,
-          statusText:`${players[current].name} fallo. Turno de ${players[nextCurrent]?.name || `Jugador ${nextCurrent + 1}`}`
+          statusText:`${players[current].name} fallo. Turno de ${players[nextCurrent]?.name || `Jugador ${nextCurrent + 1}`}`,
+          ...getOnlineTurnPatch()
         });
         return;
       }
@@ -789,7 +908,8 @@ async function resolveOnlinePair(roomId, firstId, secondId){
         roundWins,
         winnerUid:players[winnerIndex]?.uid || '',
         winnerName:players[winnerIndex]?.name || `Jugador ${winnerIndex + 1}`,
-        statusText:`${players[winnerIndex].name} gana muerte subita online`
+        statusText:`${players[winnerIndex].name} gana muerte subita online`,
+        ...getClearedOnlineTurnPatch()
       });
       return;
     }
@@ -818,7 +938,8 @@ async function resolveOnlinePair(roomId, firstId, secondId){
       winnerName:players[current]?.name || `Jugador ${current + 1}`
     } : {}),
     suddenDeathStep:room.suddenDeath && isMatch ? Number(room.suddenDeathStep || 0) + 1 : Number(room.suddenDeathStep || 0),
-    statusText
+    statusText,
+    ...(status === 'playing' ? getOnlineTurnPatch() : getClearedOnlineTurnPatch())
   });
 }
 
@@ -831,6 +952,11 @@ async function handleOnlineCardClick(id){
     const room = await getOnlineRoom(roomId);
     if(!room || room.status !== 'playing' || room.resolving) return;
     activeOnlineRoom = room;
+    const deadline = Number(room.turnDeadlineAt || 0);
+    if(deadline && Date.now() >= deadline){
+      await expireOnlineTurn(room.id, deadline);
+      return;
+    }
     if(listFromFirebase(room.players)[room.current]?.uid !== session.currentUser?.uid) return;
     const cards = listFromFirebase(room.cards).map(card => ({ ...card }));
     const card = cards.find(item => String(item.id) === String(id));

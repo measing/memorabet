@@ -1,7 +1,7 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
 import { gameState, session } from './state.js?v=73';
 import { escapeHTML, formatMoney } from './utils.js?v=71';
-import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=82';
+import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=83';
 import { t } from './i18n.js?v=1';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
@@ -338,6 +338,9 @@ export function updateStats(){
   const startAuthActions = document.getElementById('start-auth-actions');
   const onlineWaiting = document.getElementById('online-waiting');
   const onlineWaitingText = document.getElementById('online-waiting-text');
+  const topHud = document.querySelector('.top-hud');
+  const onlineTurnTimer = document.getElementById('online-turn-timer');
+  const onlineTurnSeconds = document.getElementById('online-turn-seconds');
   const controlsActive = roundActive && (!!startPanel?.classList.contains('hidden') || onlineDuel);
   const duel = gameState.localDuel || {};
   const pares = document.getElementById('pares');
@@ -361,6 +364,15 @@ export function updateStats(){
   document.body.classList.toggle('local-duel-active', localDuel);
   document.body.classList.toggle('online-duel-active', onlineDuel);
   syncStartAuthActions();
+  const deadline = Number(gameState.onlineRoom?.turnDeadlineAt || 0);
+  const timerVisible = onlineDuel && onlineStatus === 'playing' && deadline > 0 && !gameState.onlineRoom?.resolving;
+  const secondsLeft = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  topHud?.classList.toggle('online-timer-visible', timerVisible);
+  if(onlineTurnTimer){
+    onlineTurnTimer.hidden = !timerVisible;
+    onlineTurnTimer.classList.toggle('urgent', timerVisible && secondsLeft <= 3);
+  }
+  if(onlineTurnSeconds) onlineTurnSeconds.textContent = `${secondsLeft}s`;
   startPanel?.classList.toggle('online-searching', onlineSearching);
   if(onlineWaiting) onlineWaiting.hidden = !onlineSearching;
   if(onlineWaitingText){

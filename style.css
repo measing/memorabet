@@ -844,9 +844,29 @@ body::before{
   border-right:1px solid rgba(255,255,255,.14);
 }
 .hud-cell:last-child{border-right:0}
+.top-hud:not(.online-timer-visible) .hud-cell:nth-child(2){border-right:0}
 .hud-cell span{font-size:13px;text-transform:uppercase;font-weight:900;color:white}
 .hud-cell strong{display:inline-flex;align-items:center;font-size:32px;line-height:1;color:var(--green)}
 .hud-cell:first-child strong{color:var(--gold)}
+.online-turn-timer[hidden]{display:none!important}
+.online-turn-timer{
+  flex:.78 1 0;
+  background:linear-gradient(180deg, rgba(255,198,65,.12), rgba(255,70,70,.08));
+}
+.online-turn-timer strong{
+  color:#ffd35a;
+  min-width:54px;
+  justify-content:center;
+  font-variant-numeric:tabular-nums;
+}
+.online-turn-timer.urgent strong{
+  color:#ff6b6b;
+  animation:turnTimerPulse .55s ease-in-out infinite alternate;
+}
+@keyframes turnTimerPulse{
+  from{transform:scale(1);text-shadow:0 0 8px rgba(255,107,107,.28)}
+  to{transform:scale(1.08);text-shadow:0 0 18px rgba(255,107,107,.65)}
+}
 .local-duel-active .game-toolbar{display:none}
 .local-duel-active .top-hud{margin-top:0}
 .message{width:min(720px,90%);margin:-10px auto 18px;padding:11px 18px;border-radius:14px;text-align:center;border:1px solid rgba(249,199,79,.2);background:rgba(0,0,0,.52);display:none;color:#9cd4ff}.message.visible{display:block}.local-duel-active .message{display:none!important;margin:0;padding:0;border:0}.message.success{color:var(--green)}.message.warning{color:var(--gold)}.message.danger{color:#ff8c8c}
@@ -1548,6 +1568,16 @@ body.online-duel-active #btn-exit{
   }
   .hud-cell span{font-size:10px}
   .hud-cell strong{font-size:25px}
+  .top-hud.online-timer-visible .hud-cell{
+    padding:9px 5px;
+    gap:4px;
+  }
+  .online-turn-timer{
+    flex:.72 1 0;
+  }
+  .online-turn-timer strong{
+    min-width:40px;
+  }
   .message{
     width:100%;
     margin:0 auto 12px;

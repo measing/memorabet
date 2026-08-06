@@ -14,7 +14,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=3" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png?v=3" />
   <link rel="apple-touch-icon" href="assets/app-icon-192.png?v=3" />
-  <link rel="stylesheet" href="style.css?v=108" />
+  <link rel="stylesheet" href="style.css?v=109" />
 </head>
 <body>
   <div id="mobile-loading-screen" class="mobile-loading-screen" aria-hidden="true">
@@ -173,6 +173,7 @@
         <header class="top-hud">
           <div class="hud-cell"><span>Ronda:</span><strong id="round-number">1</strong></div>
           <div class="hud-cell"><span>Parejas:</span><strong id="pares">0 / 8</strong></div>
+          <div class="hud-cell online-turn-timer" id="online-turn-timer" hidden><span>Turno:</span><strong id="online-turn-seconds">10s</strong></div>
         </header>
 
         <div id="msg" class="message info visible">Presiona Comenzar juego para comenzar.</div>
@@ -466,6 +467,6 @@
       setTimeout(installFallback, isLocalFile ? 800 : 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=121"></script>
+  <script type="module" src="main.js?v=122"></script>
 </body>
 </html>
