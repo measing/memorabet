@@ -266,6 +266,16 @@ export function hideMsg(){
   m.textContent = '';
 }
 
+function syncStartAuthActions(profile = session.currentUser){
+  const hasAccount = !!profile && !profile.isGuest && profile.uid !== 'guest-local';
+  const startAuthActions = document.getElementById('start-auth-actions');
+  document.body.classList.toggle('account-connected', hasAccount);
+  if(startAuthActions){
+    startAuthActions.hidden = hasAccount;
+    startAuthActions.style.display = hasAccount ? 'none' : '';
+  }
+}
+
 export function setStartPanelVisible(isVisible){
   const panel = document.getElementById('start-game-panel');
   if(panel) panel.classList.toggle('hidden', !isVisible);
@@ -341,7 +351,7 @@ export function updateStats(){
   document.body.classList.toggle('game-controls-active', controlsActive);
   document.body.classList.toggle('local-duel-active', localDuel);
   document.body.classList.toggle('online-duel-active', onlineDuel);
-  if(startAuthActions) startAuthActions.hidden = !!session.currentUser && !session.currentUser.isGuest;
+  syncStartAuthActions();
   startPanel?.classList.toggle('online-searching', onlineSearching);
   if(onlineWaiting) onlineWaiting.hidden = !onlineSearching;
   if(onlineWaitingText){
@@ -411,6 +421,7 @@ export function updateStats(){
 
 export function renderUser(profile){
   if(!profile) return;
+  syncStartAuthActions(profile);
   document.getElementById('player-name').textContent = profile.nickname || t('common.player');
   session.cups = Number(profile.cups ?? profile.goldCups ?? 0);
   session.medals = Number(profile.medals ?? profile.silverCups ?? 0);
