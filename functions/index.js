@@ -13,6 +13,8 @@ const SOLO_RANKING_PRIZE = 10000;
 const ONLINE_WAGERS = new Set([500, 1000, 2500, 5000, 10000, 20000]);
 const ONLINE_WIN_CUPS = { min:25, max:30 };
 const ONLINE_LOSE_CUPS = { min:20, max:26 };
+const REQUIRE_APP_CHECK = process.env.REQUIRE_APP_CHECK === 'true';
+const PROTECTED_CALL_OPTIONS = REQUIRE_APP_CHECK ? { enforceAppCheck:true } : {};
 
 function requireAuth(request){
   if(!request.auth?.uid) throw new HttpsError('unauthenticated', 'Inicia sesion para continuar.');
@@ -20,6 +22,7 @@ function requireAuth(request){
 }
 
 function assertAppCheck(request){
+  if(!REQUIRE_APP_CHECK) return;
   if(!request.app) throw new HttpsError('failed-precondition', 'App Check requerido.');
 }
 
@@ -143,7 +146,7 @@ exports.deleteAccount = onCall(async request => {
   return { ok:true };
 });
 
-exports.startSoloGame = onCall({ enforceAppCheck:true }, async request => {
+exports.startSoloGame = onCall(PROTECTED_CALL_OPTIONS, async request => {
   assertAppCheck(request);
   const uid = requireAuth(request);
   const userRef = db.ref(`users/${uid}`);
@@ -177,7 +180,7 @@ exports.startSoloGame = onCall({ enforceAppCheck:true }, async request => {
   return { sessionId:sessionRef.key, saldo:nextSaldo };
 });
 
-exports.cancelSoloGame = onCall({ enforceAppCheck:true }, async request => {
+exports.cancelSoloGame = onCall(PROTECTED_CALL_OPTIONS, async request => {
   assertAppCheck(request);
   const uid = requireAuth(request);
   const sessionId = String(request.data?.sessionId || '');
@@ -201,7 +204,7 @@ exports.cancelSoloGame = onCall({ enforceAppCheck:true }, async request => {
   return { ok:true, saldo:nextSaldo };
 });
 
-exports.finishSoloGame = onCall({ enforceAppCheck:true }, async request => {
+exports.finishSoloGame = onCall(PROTECTED_CALL_OPTIONS, async request => {
   assertAppCheck(request);
   const uid = requireAuth(request);
   const sessionId = String(request.data?.sessionId || '');
@@ -280,7 +283,7 @@ exports.finishSoloGame = onCall({ enforceAppCheck:true }, async request => {
   return { saldo:finalSaldo, games, totalPairs, best, profit };
 });
 
-exports.settleOnlineRoom = onCall({ enforceAppCheck:true }, async request => {
+exports.settleOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
   assertAppCheck(request);
   const uid = requireAuth(request);
   const roomId = String(request.data?.roomId || '');

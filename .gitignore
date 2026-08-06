@@ -12,5 +12,6 @@ android/key.properties
 *.aab
 *.jks
 *.keystore
+android/*UPLOAD_KEY_INFO*.txt
 firebase-debug.log
 firebase-debug.*.log
