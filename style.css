@@ -114,7 +114,10 @@ img{
     gap:12px;
   }
   .mobile-loading-logo{
-    width:min(245px, 68vw);
+    position:fixed;
+    top:calc(16px + env(safe-area-inset-top));
+    right:14px;
+    width:clamp(92px, 28vw, 132px);
     filter:drop-shadow(0 0 18px rgba(0,0,0,.85)) drop-shadow(0 0 18px rgba(249,199,79,.28));
   }
   .mobile-loading-copy{
@@ -251,16 +254,6 @@ body::before{
   height:auto;
   display:block;
   filter:drop-shadow(0 0 20px rgba(249,199,79,.35));
-}
-.corner-brand-logo{
-  position:fixed;
-  top:18px;
-  right:22px;
-  z-index:6;
-  width:clamp(96px, 9vw, 158px);
-  height:auto;
-  pointer-events:none;
-  filter:drop-shadow(0 0 18px rgba(0,0,0,.85)) drop-shadow(0 0 18px rgba(249,199,79,.26));
 }
 .player-strip{
   display:flex;
@@ -1499,12 +1492,6 @@ body.online-duel-active #btn-exit{
     width:100%;
     margin-bottom:10px;
     align-items:stretch;
-  }
-  .corner-brand-logo{
-    top:76px;
-    right:10px;
-    width:74px;
-    opacity:.92;
   }
   .game-toolbar .player-strip{
     padding:8px 10px;
