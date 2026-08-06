@@ -37,7 +37,7 @@ import {
   showRulesModalIfNeeded,
   resetAvatarDisplay,
   resetCardSkinDisplay
-} from './ui.js?v=99';
+} from './ui.js?v=100';
 import { t } from './i18n.js?v=1';
 import { deleteAccountServer } from './cloud-functions.js?v=1';
 

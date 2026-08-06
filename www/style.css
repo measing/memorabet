@@ -974,9 +974,13 @@ body::before{
   gap:10px;
 }
 .start-auth-actions[hidden]{
-  display:none;
+  display:none!important;
 }
+html.account-connected #start-auth-actions,
 body.account-connected .start-auth-actions{
+  display:none!important;
+}
+.start-auth-actions.account-hidden{
   display:none!important;
 }
 .start-auth-button{

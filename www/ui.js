@@ -266,13 +266,22 @@ export function hideMsg(){
   m.textContent = '';
 }
 
-function syncStartAuthActions(profile = session.currentUser){
-  const hasAccount = !!profile && !profile.isGuest && profile.uid !== 'guest-local';
+function hasConnectedAccount(){
+  const user = session.currentUser;
+  return !!user && !!user.uid && user.uid !== 'guest-local' && user.isGuest !== true;
+}
+
+function syncStartAuthActions(){
+  const hasAccount = hasConnectedAccount();
   const startAuthActions = document.getElementById('start-auth-actions');
+  document.documentElement.classList.toggle('account-connected', hasAccount);
   document.body.classList.toggle('account-connected', hasAccount);
   if(startAuthActions){
+    startAuthActions.classList.toggle('account-hidden', hasAccount);
     startAuthActions.hidden = hasAccount;
-    startAuthActions.style.display = hasAccount ? 'none' : '';
+    startAuthActions.setAttribute('aria-hidden', String(hasAccount));
+    if(hasAccount) startAuthActions.style.setProperty('display', 'none', 'important');
+    else startAuthActions.style.removeProperty('display');
   }
 }
 
@@ -421,7 +430,7 @@ export function updateStats(){
 
 export function renderUser(profile){
   if(!profile) return;
-  syncStartAuthActions(profile);
+  syncStartAuthActions();
   document.getElementById('player-name').textContent = profile.nickname || t('common.player');
   session.cups = Number(profile.cups ?? profile.goldCups ?? 0);
   session.medals = Number(profile.medals ?? profile.silverCups ?? 0);

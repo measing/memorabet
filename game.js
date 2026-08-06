@@ -16,7 +16,7 @@ import {
   updateOnlineRoom,
   removeOnlineRoom
 } from './database.js?v=82';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=99';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=100';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=1';
 import { cancelSoloGameServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=1';

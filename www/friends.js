@@ -8,7 +8,7 @@ import {
   removeFriend,
   sendFriendRequest
 } from './database.js?v=82';
-import { joinOnlineGameByRoom, startFriendOnlineGame } from './game.js?v=91';
+import { joinOnlineGameByRoom, startFriendOnlineGame } from './game.js?v=92';
 
 const PENDING_FRIEND_KEY = 'memorabetPendingFriend';
 const PENDING_ROOM_KEY = 'memorabetPendingRoom';
