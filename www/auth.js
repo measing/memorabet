@@ -22,7 +22,7 @@ import {
   syncPublicProfile,
   syncPublicAwardRankings,
   makeUniqueNickname
-} from './database.js?v=79';
+} from './database.js?v=80';
 import {
   setAuthModeUI,
   showAuthModal,

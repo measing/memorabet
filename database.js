@@ -135,6 +135,25 @@ export async function getPublicProfile(uid){
   return snap.exists() ? snap.val() : null;
 }
 
+async function resolveFriendTarget(targetInput){
+  const rawTarget = String(targetInput || '').trim();
+  if(!rawTarget) return null;
+
+  const directProfile = await getPublicProfile(rawTarget);
+  if(directProfile) return { uid:rawTarget, profile:directProfile };
+
+  const cleanNick = normalizeNickname(rawTarget);
+  if(!cleanNick) return null;
+  const ownerUid = await getNicknameOwner(cleanNick);
+  if(!ownerUid) return null;
+
+  const profile = await getPublicProfile(ownerUid);
+  return {
+    uid:ownerUid,
+    profile: profile || { uid:ownerUid, nickname:rawTarget, avatar:'' }
+  };
+}
+
 export async function getUserProfile(uid){
   const snap = await get(ref(db, `users/${uid}`));
   return snap.exists() ? snap.val() : null;
@@ -510,13 +529,12 @@ export function listenFriendsBundle(uid, callback){
   };
 }
 
-export async function sendFriendRequest(fromProfile, targetUid){
+export async function sendFriendRequest(fromProfile, targetInput){
   const fromUid = fromProfile?.uid;
-  const cleanTarget = String(targetUid || '').trim();
-  if(!fromUid || !cleanTarget) throw new Error('Falta el jugador.');
+  const target = await resolveFriendTarget(targetInput);
+  if(!fromUid || !target?.uid) throw new Error('No encontre ese jugador.');
+  const cleanTarget = target.uid;
   if(fromUid === cleanTarget) throw new Error('No puedes agregarte a ti mismo.');
-  const target = await getPublicProfile(cleanTarget);
-  if(!target) throw new Error('No encontre ese jugador.');
   const friendSnap = await get(ref(db, `friends/${fromUid}/${cleanTarget}`));
   if(friendSnap.exists()) throw new Error('Ya esta en tus amigos.');
   await set(ref(db, `friendRequests/${cleanTarget}/${fromUid}`), {
@@ -525,7 +543,7 @@ export async function sendFriendRequest(fromProfile, targetUid){
     avatar: fromProfile.avatar || '',
     t: now()
   });
-  return target;
+  return target.profile;
 }
 
 export async function acceptFriendRequest(currentProfile, friendUid){

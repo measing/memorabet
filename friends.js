@@ -7,7 +7,7 @@ import {
   rejectFriendRequest,
   removeFriend,
   sendFriendRequest
-} from './database.js?v=79';
+} from './database.js?v=80';
 import { joinOnlineGameByRoom, startFriendOnlineGame } from './game.js?v=89';
 
 const PENDING_FRIEND_KEY = 'memorabetPendingFriend';
@@ -118,6 +118,16 @@ function renderShareCard(){
   if(qr) qr.src = makeQrUrl(link);
 }
 
+function hidePrivateDuelPanel(){
+  lastDuelLink = '';
+  const panel = $('friend-duel-panel');
+  const input = $('friend-duel-link');
+  const qr = $('friend-duel-qr');
+  if(panel) panel.hidden = true;
+  if(input) input.value = '';
+  if(qr) qr.removeAttribute('src');
+}
+
 function avatarMarkup(friend){
   const avatar = friend?.avatar || '';
   if(avatar) return `<img src="${escapeHTML(avatar)}" alt="" />`;
@@ -205,13 +215,14 @@ async function handleAddFriend(rawValue){
     openAuth('login');
     return;
   }
-  const friendUid = extractFriendUid(rawValue);
-  if(!friendUid){
-    setStatus('Pega un enlace o ID de jugador.', 'warning');
+  hidePrivateDuelPanel();
+  const friendTarget = extractFriendUid(rawValue);
+  if(!friendTarget){
+    setStatus('Pega un enlace, ID o nickname.', 'warning');
     return;
   }
   try{
-    const target = await sendFriendRequest(getCurrentProfile(), friendUid);
+    const target = await sendFriendRequest(getCurrentProfile(), friendTarget);
     setStatus(`Solicitud enviada a ${target.nickname || 'Jugador'}.`, 'success');
     const input = $('friend-code-input');
     if(input) input.value = '';
@@ -273,6 +284,7 @@ export function initFriendsFeature(){
   captureIncomingLinks();
   renderGate();
   renderShareCard();
+  hidePrivateDuelPanel();
   if((localStorage.getItem(PENDING_FRIEND_KEY) || localStorage.getItem(PENDING_ROOM_KEY)) && !isRealAccount()){
     document.querySelector('[data-view-target="friends"]')?.click();
     openAuth('login');
