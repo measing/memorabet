@@ -69,6 +69,47 @@
       }
     },
 
+    "publicProfiles": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'nickname', 'updatedAt']) && newData.child('uid').val() === $uid)",
+        "uid": { ".validate": "newData.isString() && newData.val() === $uid" },
+        "nickname": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30" },
+        "avatar": { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "updatedAt": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "friendRequests": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$fromUid": {
+          ".write": "auth != null && (auth.uid === $fromUid || auth.uid === $uid)",
+          ".validate": "!newData.exists() || (auth.uid === $fromUid && newData.hasChildren(['uid', 'nickname', 't']) && newData.child('uid').val() === $fromUid)",
+          "uid": { ".validate": "newData.isString() && newData.val() === $fromUid" },
+          "nickname": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30" },
+          "avatar": { ".validate": "newData.isString() && newData.val().length <= 120" },
+          "t": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "friends": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$friendUid": {
+          ".write": "auth != null && (auth.uid === $uid || auth.uid === $friendUid) && (!newData.exists() || root.child('friendRequests').child($uid).child($friendUid).exists() || root.child('friendRequests').child($friendUid).child($uid).exists())",
+          ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'since']) && newData.child('uid').val() === $friendUid)",
+          "uid": { ".validate": "newData.isString() && newData.val() === $friendUid" },
+          "since": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
     "nicknames": {
       "$nickname": {
         ".read": "auth != null",
@@ -188,7 +229,7 @@
       ".read": "auth != null",
       "$roomId": {
         ".read": "auth != null",
-        ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() === auth.uid && newData.child('players').child(auth.uid).exists()) || (data.exists() && data.child('players').child(auth.uid).exists()) || (newData.exists() && newData.child('players').child(auth.uid).exists()))",
+        ".write": "auth != null && (!data.exists() || data.child('inviteOnly').val() != true || data.child('hostUid').val() === auth.uid || data.child('invitedUid').val() === auth.uid || data.child('players').child(auth.uid).exists()) && ((!data.exists() && newData.child('hostUid').val() === auth.uid && newData.child('players').child(auth.uid).exists()) || (data.exists() && data.child('players').child(auth.uid).exists()) || (newData.exists() && newData.child('players').child(auth.uid).exists()))",
         ".validate": "!newData.exists() || (newData.hasChildren(['id', 'mode', 'status', 'players', 'hostUid', 'createdAt', 'updatedAt']) && newData.child('id').val() === $roomId)",
 
         "id": { ".validate": "newData.isString() && newData.val() === $roomId" },
@@ -224,6 +265,8 @@
         "resolving": { ".validate": "newData.isBoolean()" },
         "statusText": { ".validate": "newData.isString() && newData.val().length <= 160" },
         "hostUid": { ".validate": "newData.isString()" },
+        "invitedUid": { ".validate": "newData.isString() && newData.val().length <= 128" },
+        "inviteOnly": { ".validate": "newData.isBoolean()" },
         "winnerUid": { ".validate": "newData.isString()" },
         "winnerName": { ".validate": "newData.isString() && newData.val().length <= 30" },
         "concededBy": { ".validate": "newData.isString()" },

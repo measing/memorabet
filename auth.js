@@ -19,9 +19,10 @@ import {
   releaseNickname,
   getUserProfile,
   createUserProfile,
+  syncPublicProfile,
   syncPublicAwardRankings,
   makeUniqueNickname
-} from './database.js?v=78';
+} from './database.js?v=79';
 import {
   setAuthModeUI,
   showAuthModal,
@@ -266,6 +267,7 @@ export async function handleGoogleAccount(){
     };
     gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
     renderUser(profile);
+    syncPublicProfile(result.user.uid, profile).catch(() => {});
     syncPublicAwardRankings(result.user.uid, profile).catch(() => {});
     updateStats();
     updateAccountButton();
@@ -365,6 +367,7 @@ export async function handleAuthSubmit(){
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
+      syncPublicProfile(user.uid, profile).catch(() => {});
       syncPublicAwardRankings(user.uid, profile).catch(() => {});
       updateStats();
       updateAccountButton();
@@ -406,6 +409,7 @@ export async function handleAuthSubmit(){
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
+      syncPublicProfile(uid, profile).catch(() => {});
       syncPublicAwardRankings(uid, profile).catch(() => {});
       updateStats();
       updateAccountButton();
@@ -481,6 +485,7 @@ export function listenAuthState(){
       gameState.saldo = Number(profile.saldo ?? INITIAL_SALDO);
       hideAuthModal();
       renderUser(profile);
+      syncPublicProfile(user.uid, profile).catch(() => {});
       syncPublicAwardRankings(user.uid, profile).catch(() => {});
       updateStats();
       updateAccountButton();

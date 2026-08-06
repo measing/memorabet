@@ -15,8 +15,8 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=78';
-import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=95';
+} from './database.js?v=79';
+import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=96';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=1';
 import { cancelSoloGameServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=1';
@@ -1354,17 +1354,37 @@ export async function newMemoryDuel(){
   await prepareGame({ localDuel:true, localDuelMode:'memory' });
 }
 
-export async function startOnlineGame(mode = 'classic'){
+export async function startOnlineGame(mode = 'classic', options = {}){
   if(!session.currentUser || isGuestUser()){
     showMsg(t('msg.onlineLogin'), 'warning');
     const authModal = document.getElementById('auth-modal');
     if(authModal) authModal.style.display = 'flex';
     return;
   }
-  const wager = normalizeOnlineWager(selectedOnlineWager);
+  let targetRoom = null;
+  try{
+    if(options.roomId){
+      targetRoom = await getOnlineRoom(options.roomId);
+      if(!targetRoom) throw new Error('La sala privada ya no existe.');
+      if(targetRoom.status !== 'waiting') throw new Error('La sala privada ya empezo.');
+      const players = listFromFirebase(targetRoom.players);
+      if(players.some(player => player.uid === session.currentUser.uid)){
+        throw new Error('Ya estas dentro de esta sala privada.');
+      }
+      if(targetRoom.inviteOnly && targetRoom.invitedUid && targetRoom.invitedUid !== session.currentUser.uid && targetRoom.hostUid !== session.currentUser.uid){
+        throw new Error('Esta sala privada es para otro jugador.');
+      }
+      mode = targetRoom.mode === 'memory' ? 'memory' : 'classic';
+    }
+  }catch(error){
+    showMsg(error?.message || 'No se pudo abrir la sala privada.', 'danger');
+    return null;
+  }
+
+  const wager = normalizeOnlineWager(targetRoom?.wager ?? selectedOnlineWager);
   if(gameState.saldo < wager){
     showMsg(t('msg.noWagerBalance', { amount:formatMoney(wager) }), 'danger');
-    return;
+    return null;
   }
 
   await cleanupOnlineRoom({ removeRoom:true, silent:true });
@@ -1396,16 +1416,21 @@ export async function startOnlineGame(mode = 'classic'){
   showMsg(t('msg.searchingOnline'), 'info');
 
   try{
-    const player = getOnlinePlayerProfile();
-    const waitingRoom = await findWaitingOnlineRoom(mode, player.uid, wager);
-    const room = waitingRoom
-      ? await joinOnlineRoom(waitingRoom.id, player, wager)
-      : await createOnlineRoom(mode, player, wager);
+  const player = getOnlinePlayerProfile();
+    const waitingRoom = (!options.friendUid && !targetRoom)
+      ? await findWaitingOnlineRoom(mode, player.uid, wager)
+      : null;
+    const room = targetRoom
+      ? await joinOnlineRoom(targetRoom.id, player, wager)
+      : waitingRoom
+        ? await joinOnlineRoom(waitingRoom.id, player, wager)
+        : await createOnlineRoom(mode, player, wager, { invitedUid:options.friendUid || '' });
     activeOnlineRoom = room;
     gameState.onlineRoom = { id:room.id, mode:room.mode, status:room.status };
     gameState.onlinePot = Number(room.pot || wager);
     lastOnlineRoomStatus = waitingRoom ? 'waiting' : room.status;
     onlineRoomUnsubscribe = listenOnlineRoom(room.id, applyOnlineRoom);
+    return room;
   }catch(error){
     await refundPendingOnlineEntry(null).catch(() => {});
     await cleanupOnlineRoom({ removeRoom:false, silent:false });
@@ -1415,7 +1440,26 @@ export async function startOnlineGame(mode = 'classic'){
     clearBoard();
     updateStats();
     showMsg(error?.message || 'No se pudo entrar a una sala online.', 'danger');
+    return null;
   }
+}
+
+export async function startFriendOnlineGame(friendUid, mode = 'classic'){
+  const cleanFriendUid = String(friendUid || '').trim();
+  if(!cleanFriendUid){
+    showMsg('Selecciona un amigo para crear la sala privada.', 'warning');
+    return null;
+  }
+  return startOnlineGame(mode, { friendUid:cleanFriendUid });
+}
+
+export async function joinOnlineGameByRoom(roomId){
+  const cleanRoomId = String(roomId || '').trim();
+  if(!cleanRoomId){
+    showMsg('Ese enlace de duelo no tiene sala.', 'warning');
+    return null;
+  }
+  return startOnlineGame('classic', { roomId:cleanRoomId });
 }
 
 export async function startSelectedGame(){

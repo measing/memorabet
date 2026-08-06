@@ -1,10 +1,11 @@
-import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=83';
-import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=88';
-import { listenLiveHistory, listenLeaderboard } from './database.js?v=78';
+import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=84';
+import { closeGameModePanel, exitGame, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel } from './game.js?v=89';
+import { listenLiveHistory, listenLeaderboard } from './database.js?v=79';
 import { session } from './state.js?v=73';
-import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=95';
+import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=96';
 import { initAudioControls } from './audio.js?v=73';
 import { initI18n, translatePage } from './i18n.js?v=1';
+import { initFriendsFeature, refreshFriendsFeature } from './friends.js?v=1';
 
 window.__memorabetMainLoaded = true;
 
@@ -81,6 +82,7 @@ function bindEvents(){
   document.getElementById('btn-new')?.addEventListener('click', startSelectedGame);
   document.getElementById('btn-reset')?.addEventListener('click', resetGame);
   document.getElementById('btn-exit')?.addEventListener('click', exitGame);
+  window.addEventListener('memorabet-open-auth', event => openAuth(event.detail?.mode || 'choice'));
 }
 
 initMobileAppSupport();
@@ -93,6 +95,7 @@ initCardSkinStore();
 initAudioControls();
 initAccountSettings();
 initI18n();
+initFriendsFeature();
 setAuthMode('choice');
 updateStats();
 listenAuthState();
@@ -118,4 +121,5 @@ listenLeaderboard(ranking => {
 setInterval(() => {
   updateStats();
   renderLiveHistoryList();
+  refreshFriendsFeature();
 }, 1000);

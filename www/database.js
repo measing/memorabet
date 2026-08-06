@@ -119,6 +119,22 @@ export async function releaseNickname(cleanNick){
   await remove(ref(db, `nicknames/${cleanNick}`));
 }
 
+export async function syncPublicProfile(uid, profile = {}){
+  if(!uid || !profile) return;
+  await set(ref(db, `publicProfiles/${uid}`), {
+    uid,
+    nickname: publicRankingName(profile),
+    avatar: profile.avatar || '',
+    updatedAt: now()
+  });
+}
+
+export async function getPublicProfile(uid){
+  if(!uid) return null;
+  const snap = await get(ref(db, `publicProfiles/${uid}`));
+  return snap.exists() ? snap.val() : null;
+}
+
 export async function getUserProfile(uid){
   const snap = await get(ref(db, `users/${uid}`));
   return snap.exists() ? snap.val() : null;
@@ -146,6 +162,7 @@ export async function createUserProfile(uid, { nickname, email }){
     updatedAt: now()
   };
   await set(ref(db, `users/${uid}`), profile);
+  await syncPublicProfile(uid, profile);
   return profile;
 }
 
@@ -213,6 +230,8 @@ export async function syncPublicAwardRankings(uid, profile = {}){
 
 export async function updateUserAvatar(uid, avatar){
   await update(ref(db, `users/${uid}`), { avatar, updatedAt: now() });
+  const profile = await getUserProfile(uid).catch(() => null);
+  if(profile) await syncPublicProfile(uid, { ...profile, avatar }).catch(() => {});
   await updatePublicAvatar(uid, avatar).catch(() => {});
 }
 
@@ -359,6 +378,7 @@ export async function findWaitingOnlineRoom(mode, uid, wager = 0){
     .map(([id, room]) => ({ id, ...room, players:listFromFirebase(room.players) }))
     .filter(room => room.mode === mode
       && Number(room.wager || 0) === Number(wager || 0)
+      && !room.inviteOnly
       && room.status === 'waiting'
       && room.players.length === 1
       && room.players[0]?.uid !== uid)
@@ -366,7 +386,7 @@ export async function findWaitingOnlineRoom(mode, uid, wager = 0){
   return candidates[0] || null;
 }
 
-export async function createOnlineRoom(mode, player, wager = 0){
+export async function createOnlineRoom(mode, player, wager = 0, options = {}){
   const roomRef = push(ref(db, 'onlineRooms'));
   const entry = Math.max(0, Number(wager || 0));
   const room = {
@@ -392,6 +412,8 @@ export async function createOnlineRoom(mode, player, wager = 0){
     matchOver: false,
     statusText: 'Esperando rival online...',
     hostUid: player.uid,
+    invitedUid: options.invitedUid || '',
+    inviteOnly: !!options.invitedUid,
     createdAt: now(),
     updatedAt: now()
   };
@@ -405,6 +427,9 @@ export async function joinOnlineRoom(roomId, player, wager = 0){
   if(!snap.exists()) throw new Error('La sala ya no existe.');
   const room = snap.val();
   if(room.status !== 'waiting') throw new Error('La sala ya empezo.');
+  if(room.inviteOnly && room.invitedUid && room.invitedUid !== player.uid && room.hostUid !== player.uid){
+    throw new Error('Esta sala privada es para otro jugador.');
+  }
   const entry = Math.max(0, Number(wager || 0));
   if(Number(room.wager || 0) !== entry) throw new Error('La entrada de esa sala ya no coincide.');
   const players = listFromFirebase(room.players);
@@ -440,6 +465,93 @@ export async function updateOnlineRoom(roomId, patch){
 
 export async function removeOnlineRoom(roomId){
   await remove(ref(db, `onlineRooms/${roomId}`));
+}
+
+export function listenFriendsBundle(uid, callback){
+  if(!uid){
+    callback({ friends:[], requests:[] });
+    return () => {};
+  }
+
+  const state = { friendIds:[], requests:[], profiles:{} };
+  let profileStops = [];
+
+  const emit = () => callback({
+    friends: state.friendIds.map(friendUid => ({ uid:friendUid, ...(state.profiles[friendUid] || {}) })),
+    requests: state.requests.map(request => ({ ...request, ...(state.profiles[request.uid] || {}) }))
+  });
+
+  const syncProfiles = ids => {
+    profileStops.forEach(stop => stop());
+    profileStops = [...new Set(ids)].filter(Boolean).map(profileUid => onValue(ref(db, `publicProfiles/${profileUid}`), snap => {
+      state.profiles[profileUid] = snap.exists() ? snap.val() : { uid:profileUid, nickname:'Jugador', avatar:'' };
+      emit();
+    }));
+  };
+
+  const stopFriends = onValue(ref(db, `friends/${uid}`), snap => {
+    state.friendIds = Object.keys(snap.val() || {});
+    syncProfiles([...state.friendIds, ...state.requests.map(request => request.uid)]);
+    emit();
+  });
+
+  const stopRequests = onValue(ref(db, `friendRequests/${uid}`), snap => {
+    state.requests = Object.entries(snap.val() || {})
+      .map(([requestUid, request]) => ({ uid:requestUid, ...(request || {}) }))
+      .sort((a, b) => Number(b.t || 0) - Number(a.t || 0));
+    syncProfiles([...state.friendIds, ...state.requests.map(request => request.uid)]);
+    emit();
+  });
+
+  return () => {
+    stopFriends();
+    stopRequests();
+    profileStops.forEach(stop => stop());
+  };
+}
+
+export async function sendFriendRequest(fromProfile, targetUid){
+  const fromUid = fromProfile?.uid;
+  const cleanTarget = String(targetUid || '').trim();
+  if(!fromUid || !cleanTarget) throw new Error('Falta el jugador.');
+  if(fromUid === cleanTarget) throw new Error('No puedes agregarte a ti mismo.');
+  const target = await getPublicProfile(cleanTarget);
+  if(!target) throw new Error('No encontre ese jugador.');
+  const friendSnap = await get(ref(db, `friends/${fromUid}/${cleanTarget}`));
+  if(friendSnap.exists()) throw new Error('Ya esta en tus amigos.');
+  await set(ref(db, `friendRequests/${cleanTarget}/${fromUid}`), {
+    uid:fromUid,
+    nickname: fromProfile.nickname || 'Jugador',
+    avatar: fromProfile.avatar || '',
+    t: now()
+  });
+  return target;
+}
+
+export async function acceptFriendRequest(currentProfile, friendUid){
+  const uid = currentProfile?.uid;
+  const cleanFriend = String(friendUid || '').trim();
+  if(!uid || !cleanFriend) return;
+  const updates = {};
+  updates[`friends/${uid}/${cleanFriend}`] = { uid:cleanFriend, since:now() };
+  updates[`friends/${cleanFriend}/${uid}`] = { uid, since:now() };
+  updates[`friendRequests/${uid}/${cleanFriend}`] = null;
+  await update(ref(db), updates);
+}
+
+export async function rejectFriendRequest(uid, friendUid){
+  if(!uid || !friendUid) return;
+  await remove(ref(db, `friendRequests/${uid}/${friendUid}`));
+}
+
+export async function removeFriend(uid, friendUid){
+  if(!uid || !friendUid) return;
+  const updates = {};
+  updates[`friends/${uid}/${friendUid}`] = null;
+  updates[`friends/${friendUid}/${uid}`] = null;
+  updates[`friendRequests/${uid}/${friendUid}`] = null;
+  updates[`friendRequests/${friendUid}/${uid}`] = null;
+  await update(ref(db), updates);
 }
 
 export async function makeUniqueNickname(base){

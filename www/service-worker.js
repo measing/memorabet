@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-web-v110';
+const CACHE_NAME = 'memorabet-web-v111';
 
 const LOCAL_ASSETS = [
   './',
@@ -14,6 +14,7 @@ const LOCAL_ASSETS = [
   './constants.js',
   './database.js',
   './firebase-config.js',
+  './friends.js',
   './game.js',
   './i18n.js',
   './state.js',

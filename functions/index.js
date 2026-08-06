@@ -114,6 +114,28 @@ async function removeUserHistory(uid){
   }
 }
 
+async function removeUserSocialData(uid){
+  const updates = {
+    [`publicProfiles/${uid}`]: null,
+    [`friendRequests/${uid}`]: null,
+    [`friends/${uid}`]: null
+  };
+
+  const friendsSnap = await db.ref(`friends/${uid}`).get();
+  friendsSnap.forEach(friendSnap => {
+    updates[`friends/${friendSnap.key}/${uid}`] = null;
+  });
+
+  const requestsSnap = await db.ref('friendRequests').get();
+  requestsSnap.forEach(userRequestsSnap => {
+    if(userRequestsSnap.key !== uid && userRequestsSnap.child(uid).exists()){
+      updates[`friendRequests/${userRequestsSnap.key}/${uid}`] = null;
+    }
+  });
+
+  await db.ref().update(updates);
+}
+
 exports.deleteAccount = onCall(async request => {
   const uid = requireAuth(request);
   const profile = await getProfile(uid);
@@ -131,6 +153,7 @@ exports.deleteAccount = onCall(async request => {
 
   await Promise.all(deletes);
   await removeUserHistory(uid);
+  await removeUserSocialData(uid);
 
   const roomsSnap = await db.ref('onlineRooms').get();
   const roomUpdates = {};

@@ -9,8 +9,10 @@ Ultima actualizacion: 6 de agosto de 2026.
 - Firebase Android: configurado con `android/app/google-services.json`
 - Google Login Android: usa plugin nativo `@capacitor-firebase/authentication`
 - Realtime Database: reglas cerradas para rankings/historial directos
-- Cloud Functions: preparadas para partidas seguras, liquidacion online y eliminacion de cuenta
-- AAB release: pendiente de generar con `generar-aab-release.bat`
+- Realtime Database Rules: desplegadas en `memorabet-77fea`
+- Cloud Functions: preparadas, pero pendientes de desplegar porque Firebase exige plan Blaze
+- AAB release: generado en `android/app/build/outputs/bundle/release/app-release.aab`
+- APK debug: generado en `android/app/build/outputs/apk/debug/app-debug.apk`
 
 ## URLs para Play Console
 
@@ -94,21 +96,33 @@ MemoraBet no usa dinero real, no permite apuestas con dinero real y no entrega p
 
 ## Pruebas antes de enviar
 
-- Instalar APK/AAB en Android.
-- Crear cuenta con correo.
-- Iniciar sesion con Google.
-- Cerrar sesion.
-- Eliminar cuenta.
-- Jugar modo solo.
-- Jugar duelo de pares.
-- Jugar duelo de memoria.
-- Probar ranking.
-- Probar historial.
-- Probar tienda.
-- Probar perfil/avatar.
-- Probar idioma.
-- Probar audio.
-- Probar online con dos cuentas si es posible.
+- [ ] Subir AAB a Internal testing o Closed testing en Play Console.
+- [ ] Instalar desde Google Play testing, no solo APK manual.
+- [ ] Crear cuenta con correo.
+- [ ] Iniciar sesion con Google.
+- [ ] Cerrar sesion.
+- [ ] Eliminar cuenta desde Configuracion.
+- [ ] Solicitar eliminacion desde `https://memorabet.site/eliminar-cuenta.html`.
+- [ ] Jugar modo solo.
+- [ ] Jugar duelo de pares.
+- [ ] Jugar duelo de memoria.
+- [ ] Probar ranking.
+- [ ] Probar historial.
+- [ ] Probar tienda.
+- [ ] Probar perfil/avatar.
+- [ ] Probar idioma.
+- [ ] Probar audio.
+- [ ] Probar online con dos cuentas si es posible.
+
+## Pendientes actuales
+
+- Activar plan Blaze en Firebase si se quieren desplegar Cloud Functions.
+- Desplegar Cloud Functions despues de activar Blaze.
+- Despues de subir el AAB a Play Console, copiar la SHA-1/SHA-256 de "App signing key certificate" y agregarla en Firebase Android si Google Login falla en la app instalada desde Play.
+- Completar Data safety en Play Console.
+- Completar declaracion de eliminacion de cuenta en Play Console.
+- Preparar ficha de Play Store: icono final, feature graphic, capturas, descripcion, paises, clasificacion de contenido y correo de soporte.
+- Realizar prueba cerrada si la cuenta de Play Console lo exige.
 
 ## Requisitos de cuenta Google Play
 

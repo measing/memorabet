@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png" />
   <link rel="apple-touch-icon" href="assets/app-icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=100" />
+  <link rel="stylesheet" href="style.css?v=101" />
 </head>
 <body>
   <div id="auth-modal" class="nickname-modal" style="display:none">
@@ -127,6 +127,7 @@
         <button class="menu-item active" type="button" data-view-target="game" aria-current="page"><span class="menu-emoji" aria-hidden="true">&#127918;</span><span class="menu-label">Jugar</span></button>
         <button class="menu-item" type="button" data-view-target="store"><span class="menu-emoji" aria-hidden="true">&#128722;</span><span class="menu-label">Tienda</span></button>
         <button class="menu-item" type="button" data-view-target="profile"><span class="menu-emoji" aria-hidden="true">&#128100;</span><span class="menu-label">Perfil</span></button>
+        <button class="menu-item" type="button" data-view-target="friends"><span class="menu-emoji" aria-hidden="true">&#129309;</span><span class="menu-label">Amigos</span></button>
         <button class="menu-item" type="button" data-view-target="ranking"><span class="menu-emoji" aria-hidden="true">&#127942;</span><span class="menu-label">Ranking</span></button>
         <button class="menu-item" type="button" data-view-target="history"><span class="menu-emoji" aria-hidden="true">&#128220;</span><span class="menu-label">Historial</span></button>
       </nav>
@@ -247,6 +248,81 @@
             <span>Promedio:</span><strong id="hist-avg">0.00</strong>
             <span>Mejor:</span><strong id="hist-best">0/8</strong>
             <span>Total:</span><strong id="hist-profit">$0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen-view page-view" id="friends-view" data-view="friends">
+        <div class="view-panel friends-panel">
+          <div class="view-heading">
+            <span aria-hidden="true">&#129309;</span>
+            <h1>Amigos</h1>
+          </div>
+
+          <div id="friends-auth-gate" class="friends-auth-gate">
+            <h2>Conecta una cuenta</h2>
+            <p>Inicia sesion o crea una cuenta para agregar amigos, recibir invitaciones y jugar duelos privados.</p>
+            <div class="friends-actions">
+              <button class="friend-action" type="button" data-friends-login>Iniciar sesion</button>
+              <button class="friend-action primary" type="button" data-friends-register>Crear cuenta</button>
+            </div>
+          </div>
+
+          <div id="friends-content" class="friends-content" hidden>
+            <section class="friends-share-card">
+              <div>
+                <h2>Tu invitacion</h2>
+                <p>Comparte este QR o enlace para que te agreguen como amigo.</p>
+                <input id="friend-share-link" class="friend-input" type="text" readonly value="" aria-label="Enlace para agregar amigo" />
+                <div class="friends-actions">
+                  <button class="friend-action" id="btn-copy-friend-link" type="button">Copiar enlace</button>
+                  <button class="friend-action primary" id="btn-share-friend-link" type="button">Compartir</button>
+                </div>
+              </div>
+              <div class="friend-qr-box">
+                <img id="friend-qr" src="" alt="QR para agregar amigo" />
+              </div>
+            </section>
+
+            <section class="friend-add-card">
+              <h2>Agregar amigo</h2>
+              <div class="friend-add-row">
+                <input id="friend-code-input" class="friend-input" type="text" placeholder="Pega un enlace o ID de jugador" autocomplete="off" />
+                <button class="friend-action primary" id="btn-add-friend" type="button">Enviar</button>
+              </div>
+              <p id="friends-status" class="friends-status" aria-live="polite"></p>
+            </section>
+
+            <section class="friends-list-section">
+              <div class="friends-section-title">
+                <h2>Solicitudes</h2>
+                <span id="friend-request-count">0</span>
+              </div>
+              <div id="friend-requests-list" class="friends-list"><p class="empty">No tienes solicitudes pendientes.</p></div>
+            </section>
+
+            <section class="friends-list-section">
+              <div class="friends-section-title">
+                <h2>Mis amigos</h2>
+                <span id="friend-count">0</span>
+              </div>
+              <div id="friends-list" class="friends-list"><p class="empty">Aun no has agregado amigos.</p></div>
+            </section>
+
+            <section id="friend-duel-panel" class="friend-duel-panel" hidden>
+              <div>
+                <h2>Invitacion privada</h2>
+                <p id="friend-duel-text">Comparte este enlace para jugar.</p>
+                <input id="friend-duel-link" class="friend-input" type="text" readonly value="" aria-label="Enlace de sala privada" />
+                <div class="friends-actions">
+                  <button class="friend-action" id="btn-copy-duel-link" type="button">Copiar duelo</button>
+                  <button class="friend-action primary" id="btn-share-duel-link" type="button">Compartir duelo</button>
+                </div>
+              </div>
+              <div class="friend-qr-box">
+                <img id="friend-duel-qr" src="" alt="QR de sala privada" />
+              </div>
+            </section>
           </div>
         </div>
       </section>
@@ -373,6 +449,6 @@
       setTimeout(installFallback, isLocalFile ? 800 : 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=110"></script>
+  <script type="module" src="main.js?v=111"></script>
 </body>
 </html>
