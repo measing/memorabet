@@ -1028,8 +1028,8 @@ body.account-connected .start-auth-actions{
 .coin-gift-button{
   pointer-events:auto;
   position:absolute;
-  right:clamp(6px, 1.8vw, 24px);
-  top:38%;
+  right:clamp(18px, 5vw, 62px);
+  top:clamp(96px, 18%, 140px);
   width:clamp(78px, 8.4vw, 118px);
   aspect-ratio:1;
   display:grid;
@@ -1693,8 +1693,8 @@ body.online-duel-active #btn-exit{
     font-size:22px;
   }
   .coin-gift-button{
-    right:0;
-    top:33%;
+    right:clamp(8px, 3vw, 18px);
+    top:clamp(72px, 18%, 108px);
     width:clamp(70px, 20vw, 90px);
   }
   .coin-gift-timer{
@@ -1883,7 +1883,7 @@ body.online-duel-active #btn-exit{
   .casino-menu{grid-template-columns:repeat(2,minmax(0,1fr))}
   .board{grid-template-columns:repeat(4,minmax(62px,1fr));gap:7px}
   .start-game-button{min-width:min(280px,86vw);font-size:20px}
-  .coin-gift-button{width:68px;right:-2px}
+  .coin-gift-button{width:68px;right:6px}
   .hud-cell{flex-direction:column;gap:3px}
   .bottom-hud{gap:7px}
 }
