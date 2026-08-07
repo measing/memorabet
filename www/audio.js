@@ -19,6 +19,8 @@ let effectsGain;
 let musicAudio = null;
 let currentMusicIndex = -1;
 let rivalFoundAudio = null;
+let audioBoundToLifecycle = false;
+let pausedByBackground = false;
 
 function clampVolume(value, fallback){
   const number = Number(value);
@@ -178,7 +180,13 @@ function pickMusicTrackIndex(){
 
 function startMusic(){
   if(!isMusicEnabled() || !isSoundEnabled()) return;
+  if(document.hidden) return;
   if(musicAudio && !musicAudio.paused) return;
+  if(musicAudio && musicAudio.paused){
+    applyVolumes();
+    musicAudio.play().catch(() => {});
+    return;
+  }
 
   currentMusicIndex = pickMusicTrackIndex();
   musicAudio = new Audio(MUSIC_TRACKS[currentMusicIndex]);
@@ -197,6 +205,35 @@ function stopMusic(){
     musicAudio.currentTime = 0;
     musicAudio = null;
   }
+}
+
+function pauseAudioForBackground(){
+  pausedByBackground = Boolean(musicAudio && !musicAudio.paused);
+  if(musicAudio) musicAudio.pause();
+  if(rivalFoundAudio) rivalFoundAudio.pause();
+  if(audioCtx?.state === 'running') audioCtx.suspend().catch(() => {});
+}
+
+async function resumeAudioFromBackground(){
+  if(document.hidden) return;
+  if(audioCtx?.state === 'suspended') await audioCtx.resume().catch(() => {});
+  if(pausedByBackground && isSoundEnabled() && isMusicEnabled()) startMusic();
+  pausedByBackground = false;
+}
+
+function handleAudioLifecycle(){
+  if(document.hidden) pauseAudioForBackground();
+  else resumeAudioFromBackground();
+}
+
+function bindAudioLifecycle(){
+  if(audioBoundToLifecycle) return;
+  audioBoundToLifecycle = true;
+  document.addEventListener('visibilitychange', handleAudioLifecycle);
+  window.addEventListener('pagehide', pauseAudioForBackground);
+  window.addEventListener('blur', pauseAudioForBackground);
+  window.addEventListener('focus', resumeAudioFromBackground);
+  document.addEventListener('freeze', pauseAudioForBackground);
 }
 
 function ensureAudioDefaults(){
@@ -265,6 +302,7 @@ export function initAudioControls(){
   ensureAudioDefaults();
   updateSoundButtons();
   updateVolumeControls();
+  bindAudioLifecycle();
 
   document.addEventListener('pointerdown', unlockAudio, { once:true });
   document.addEventListener('keydown', unlockAudio, { once:true });

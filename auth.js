@@ -163,6 +163,10 @@ function setSettingsVisible(isVisible){
   if(!modal) return;
   modal.classList.toggle('visible', isVisible);
   modal.setAttribute('aria-hidden', String(!isVisible));
+  if(isVisible){
+    const box = modal.querySelector('.settings-box');
+    if(box) box.scrollTop = 0;
+  }
 }
 
 function showSettingsStatus(text, type='info'){
