@@ -2,12 +2,6 @@ import { ANIMAL_CARDS, K_MAX, TOTAL_PAIRS, G, C, ONLINE_WAGERS, ONLINE_WIN_CUPS,
 import { createLocalDuelState, gameState, session } from './state.js?v=73';
 import { shuffle, wait, formatMoney } from './utils.js?v=71';
 import {
-  updateSaldo,
-  updateCoinGift,
-  applyOnlineResult,
-  addLiveHistory,
-  updateUserStats,
-  addLeaderboardEntry,
   getUserProfile,
   findWaitingOnlineRoom,
   createOnlineRoom,
@@ -17,11 +11,11 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom
-} from './database.js?v=84';
+} from './database.js?v=85';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=4';
-import { cancelSoloGameServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=1';
+import { cancelSoloGameServer, claimCoinGiftServer, concedeOnlineRoomServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=3';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -58,59 +52,15 @@ function isGuestUser(){
 }
 
 function shouldUseLocalSoloFallback(error){
-  const code = String(error?.code || '').toLowerCase();
-  const message = String(error?.message || '').toLowerCase();
-  return code.includes('internal')
-    || code.includes('unavailable')
-    || code.includes('not-found')
-    || message === 'internal'
-    || message.includes('internal')
-    || message.includes('app check')
-    || message.includes('function')
-    || message.includes('network');
+  return false;
 }
 
 async function startSoloLocalFallback(){
-  const uid = session.currentUser?.uid;
-  if(!uid) throw new Error('Inicia sesion nuevamente para jugar.');
-  gameState.soloSessionId = LOCAL_SOLO_SESSION_ID;
-  gameState.saldo -= C;
-  await updateSaldo(uid, gameState.saldo);
-  showMsg('Modo Android de prueba: partida iniciada con Firebase local.', 'warning');
+  throw new Error('Las partidas seguras requieren Firebase Functions desplegadas.');
 }
 
 async function finishSoloLocalFallback({ tiempoMs, premioRanking }){
-  const uid = session.currentUser?.uid;
-  if(!uid) return;
-  const user = session.currentUser?.nickname || 'Jugador';
-  const avatar = getSelectedAvatar();
-  const updated = await updateUserStats(uid, {
-    pares: gameState.matched,
-    net: gameState.gananciaPartida,
-    saldo: gameState.saldo
-  });
-  await addLiveHistory({
-    uid,
-    user,
-    pares: gameState.matched,
-    intentos: gameState.intentos,
-    net: gameState.gananciaPartida,
-    avatar
-  });
-  if(gameState.matched === TOTAL_PAIRS){
-    await addLeaderboardEntry({
-      uid,
-      user,
-      tiempoMs,
-      intentos: gameState.intentos,
-      pares: gameState.matched,
-      premio: premioRanking,
-      avatar
-    }).catch(error => {
-      console.warn('MemoraBet ranking fallback omitido:', error);
-    });
-  }
-  renderUserStats(updated);
+  throw new Error('Los resultados seguros requieren Firebase Functions desplegadas.');
 }
 
 function isOnlineDuelActive(){
@@ -549,11 +499,12 @@ async function refundPendingOnlineEntry(room = activeOnlineRoom){
   const hasOpponent = players.some(player => player.uid && player.uid !== session.currentUser.uid);
   const canRefund = !room || room.status === 'waiting' || room.status === 'searching' || !hasOpponent;
   if(!canRefund || room?.economySettled) return false;
-  gameState.saldo += wager;
+  const result = room?.id ? await removeOnlineRoom(room.id).catch(() => null) : null;
+  if(Number.isFinite(Number(result?.saldo))) gameState.saldo = Number(result.saldo);
+  else gameState.saldo += wager;
   gameState.gananciaPartida = 0;
   gameState.onlineWager = 0;
   gameState.onlinePot = 0;
-  await updateSaldo(session.currentUser.uid, gameState.saldo);
   updateStats();
   return true;
 }
@@ -1080,15 +1031,7 @@ async function concedeOnlineRoom(){
   const opponent = players.find(player => player.uid !== myUid);
   if(myIndex < 0 || !opponent) return false;
 
-  await updateOnlineRoom(roomId, {
-    status:'finished',
-    resolving:false,
-    matchOver:true,
-    winnerUid:opponent.uid,
-    winnerName:opponent.name || 'Jugador',
-    concededBy:myUid || '',
-    statusText:`${opponent.name || 'Jugador'} gana por abandono`
-  });
+  await concedeOnlineRoomServer(roomId);
   return true;
 }
 
@@ -1344,11 +1287,23 @@ export async function claimCoinGift(){
     return;
   }
 
-  const nextClaimAt = Date.now() + COIN_GIFT_COOLDOWN_MS;
-  gameState.saldo = Number(profile?.saldo ?? gameState.saldo) + COIN_GIFT_AMOUNT;
-  localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
-  if(isGuestUser()) saveGuestBalance();
-  else await updateCoinGift(uid, gameState.saldo, nextClaimAt);
+  if(isGuestUser()){
+    const nextClaimAt = Date.now() + COIN_GIFT_COOLDOWN_MS;
+    gameState.saldo = Number(profile?.saldo ?? gameState.saldo) + COIN_GIFT_AMOUNT;
+    localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
+    saveGuestBalance();
+  }else{
+    const result = await claimCoinGiftServer();
+    const nextClaimAt = Number(result.coinGiftNextAt || 0);
+    if(nextClaimAt) localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
+    if(Number.isFinite(Number(result.saldo))) gameState.saldo = Number(result.saldo);
+    if(!result.ok){
+      updateStats();
+      updateCoinGiftButton();
+      showMsg(t('coinGift.wait', { time:formatCoinGiftWait(Math.max(0, nextClaimAt - Date.now())) }), 'warning');
+      return;
+    }
+  }
   updateStats();
   updateCoinGiftButton();
   closeCoinGiftModal();
@@ -1693,8 +1648,6 @@ export async function startOnlineGame(mode = 'classic', options = {}){
   gameState.gananciaPartida = -wager;
   gameState.onlineWager = wager;
   gameState.onlinePot = wager;
-  gameState.saldo -= wager;
-  await updateSaldo(session.currentUser.uid, gameState.saldo);
   gameState.onlineRoom = { mode, status:'searching', wager, pot:wager };
   gameState.localDuel = createLocalDuelState();
   gameState.localDuel.active = true;
@@ -1720,6 +1673,7 @@ export async function startOnlineGame(mode = 'classic', options = {}){
         ? await joinOnlineRoom(waitingRoom.id, player, wager)
         : await createOnlineRoom(mode, player, wager, { invitedUid:options.friendUid || '' });
     activeOnlineRoom = room;
+    if(Number.isFinite(Number(room.saldoAfterEntry))) gameState.saldo = Number(room.saldoAfterEntry);
     gameState.onlineRoom = { id:room.id, mode:room.mode, status:room.status };
     gameState.onlinePot = Number(room.pot || wager);
     lastOnlineRoomStatus = waitingRoom ? 'waiting' : room.status;

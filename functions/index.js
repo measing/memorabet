@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
+const { onValueCreated } = require('firebase-functions/v2/database');
 
 admin.initializeApp();
 
@@ -13,6 +14,8 @@ const SOLO_RANKING_PRIZE = 10000;
 const ONLINE_WAGERS = new Set([500, 1000, 2500, 5000, 10000, 20000]);
 const ONLINE_WIN_CUPS = { min:25, max:30 };
 const ONLINE_LOSE_CUPS = { min:20, max:26 };
+const COIN_GIFT_AMOUNT = 1000;
+const COIN_GIFT_COOLDOWN_MS = 2 * 60 * 60 * 1000;
 const REQUIRE_APP_CHECK = process.env.REQUIRE_APP_CHECK === 'true';
 const PROTECTED_CALL_OPTIONS = REQUIRE_APP_CHECK ? { enforceAppCheck:true } : {};
 
@@ -49,6 +52,41 @@ function safeName(profile = {}){
 function safeAvatar(profile = {}){
   const avatar = String(profile.avatar || '');
   return avatar.length <= 120 ? avatar : '';
+}
+
+function listPlayers(players = {}){
+  return Object.values(players || {})
+    .filter(player => player && player.uid)
+    .sort((a, b) => Number(a.seat || 0) - Number(b.seat || 0));
+}
+
+function assertParticipant(room, uid){
+  if(!room?.players?.[uid]) throw new HttpsError('permission-denied', 'No perteneces a esta sala.');
+}
+
+function allowedWager(value){
+  const wager = Number(value || 0);
+  if(!ONLINE_WAGERS.has(wager)) throw new HttpsError('invalid-argument', 'Entrada online no valida.');
+  return wager;
+}
+
+async function adjustSaldo(uid, delta){
+  const userRef = db.ref(`users/${uid}`);
+  let nextProfile = null;
+  const result = await userRef.transaction(profile => {
+    if(!profile) return profile;
+    const current = Number(profile.saldo ?? INITIAL_SALDO);
+    const nextSaldo = current + Number(delta || 0);
+    if(nextSaldo < 0) return;
+    nextProfile = {
+      ...profile,
+      saldo:nextSaldo,
+      updatedAt:now()
+    };
+    return nextProfile;
+  }, undefined, false);
+  if(!result.committed || !nextProfile) throw new HttpsError('failed-precondition', 'Saldo insuficiente.');
+  return nextProfile;
 }
 
 async function getProfile(uid){
@@ -167,6 +205,42 @@ exports.deleteAccount = onCall(async request => {
 
   await admin.auth().deleteUser(uid);
   return { ok:true };
+});
+
+exports.claimCoinGift = onCall(PROTECTED_CALL_OPTIONS, async request => {
+  assertAppCheck(request);
+  const uid = requireAuth(request);
+  const userRef = db.ref(`users/${uid}`);
+  const claimAt = now();
+  let nextProfile = null;
+
+  const result = await userRef.transaction(profile => {
+    if(!profile) return profile;
+    const nextAt = Number(profile.coinGiftNextAt || 0);
+    if(nextAt > claimAt) return;
+    nextProfile = {
+      ...profile,
+      saldo:Number(profile.saldo ?? INITIAL_SALDO) + COIN_GIFT_AMOUNT,
+      coinGiftNextAt:claimAt + COIN_GIFT_COOLDOWN_MS,
+      updatedAt:claimAt
+    };
+    return nextProfile;
+  }, undefined, false);
+
+  if(!result.committed || !nextProfile){
+    const profile = await getProfile(uid);
+    return {
+      ok:false,
+      saldo:Number(profile.saldo ?? INITIAL_SALDO),
+      coinGiftNextAt:Number(profile.coinGiftNextAt || 0)
+    };
+  }
+
+  return {
+    ok:true,
+    saldo:Number(nextProfile.saldo || 0),
+    coinGiftNextAt:Number(nextProfile.coinGiftNextAt || 0)
+  };
 });
 
 exports.startSoloGame = onCall(PROTECTED_CALL_OPTIONS, async request => {
@@ -319,6 +393,7 @@ exports.settleOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
   if(room.hostUid !== uid) throw new HttpsError('permission-denied', 'Solo el host puede cerrar economia.');
   if(room.status !== 'finished') throw new HttpsError('failed-precondition', 'La sala no termino.');
   if(room.economySettled && room.economyRewards) return room.economyRewards;
+  if(room.economySettled && !room.economyRewards) throw new HttpsError('aborted', 'La economia de esta sala se esta cerrando.');
 
   const players = Object.values(room.players || {}).sort((a, b) => Number(a.seat || 0) - Number(b.seat || 0)).slice(0, 2);
   const winner = players.find(player => player.uid === room.winnerUid) || players[Number(room.current || 0)] || players[0];
@@ -341,6 +416,17 @@ exports.settleOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
     loserCups:randomInt(ONLINE_LOSE_CUPS.min, ONLINE_LOSE_CUPS.max)
   };
 
+  const settlementLock = await roomRef.child('economySettled').transaction(current => {
+    if(current === true) return;
+    return true;
+  }, undefined, false);
+  if(!settlementLock.committed){
+    const freshSnap = await roomRef.get();
+    const freshRoom = freshSnap.exists() ? freshSnap.val() : {};
+    if(freshRoom.economyRewards) return freshRoom.economyRewards;
+    throw new HttpsError('aborted', 'La economia de esta sala ya fue procesada.');
+  }
+
   await applyOnlineResult(winner.uid, {
     saldoDelta:pot,
     trophiesDelta:rewards.winnerCups,
@@ -353,10 +439,282 @@ exports.settleOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
   });
 
   await roomRef.update({
-    economySettled:true,
     economyRewards:rewards,
     updatedAt:now()
   });
 
   return rewards;
+});
+
+exports.createOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
+  assertAppCheck(request);
+  const uid = requireAuth(request);
+  const mode = request.data?.mode === 'memory' ? 'memory' : 'classic';
+  const wager = allowedWager(request.data?.wager);
+  const invitedUid = String(request.data?.invitedUid || '').trim().slice(0, 128);
+  const profile = await adjustSaldo(uid, -wager);
+  const roomRef = db.ref('onlineRooms').push();
+  const room = {
+    id:roomRef.key,
+    mode,
+    wager,
+    pot:wager,
+    economySettled:false,
+    status:'waiting',
+    players:{
+      [uid]:{
+        uid,
+        name:safeName(profile),
+        avatar:safeAvatar(profile),
+        score:0,
+        wager,
+        seat:0
+      }
+    },
+    current:0,
+    cards:[],
+    flipped:[],
+    matched:0,
+    intentos:0,
+    round:1,
+    roundWins:[0, 0],
+    suddenDeath:false,
+    suddenDeathStep:0,
+    suddenDeathLead:-1,
+    matchOver:false,
+    turnStartedAt:0,
+    turnDurationMs:10000,
+    turnDeadlineAt:0,
+    resolving:false,
+    statusText:'Esperando rival online...',
+    hostUid:uid,
+    invitedUid,
+    inviteOnly:!!invitedUid,
+    createdAt:now(),
+    updatedAt:now()
+  };
+  try{
+    await roomRef.set(room);
+  }catch(error){
+    await adjustSaldo(uid, wager).catch(() => {});
+    throw error;
+  }
+  return { room, saldo:Number(profile.saldo || 0) };
+});
+
+exports.joinOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
+  assertAppCheck(request);
+  const uid = requireAuth(request);
+  const roomId = String(request.data?.roomId || '');
+  const wager = allowedWager(request.data?.wager);
+  if(!roomId) throw new HttpsError('invalid-argument', 'Falta sala.');
+
+  const roomRef = db.ref(`onlineRooms/${roomId}`);
+  const roomSnap = await roomRef.get();
+  if(!roomSnap.exists()) throw new HttpsError('not-found', 'La sala ya no existe.');
+  const room = roomSnap.val();
+  if(room.status !== 'waiting') throw new HttpsError('failed-precondition', 'La sala ya empezo.');
+  if(room.inviteOnly && room.invitedUid && room.invitedUid !== uid && room.hostUid !== uid){
+    throw new HttpsError('permission-denied', 'Esta sala privada es para otro jugador.');
+  }
+  if(Number(room.wager || 0) !== wager) throw new HttpsError('failed-precondition', 'La entrada de esa sala ya no coincide.');
+
+  const players = listPlayers(room.players);
+  if(players.some(player => player.uid === uid)) return { room, saldo:Number((await getProfile(uid)).saldo ?? INITIAL_SALDO) };
+  if(players.length >= 2) throw new HttpsError('failed-precondition', 'La sala esta llena.');
+
+  const profile = await adjustSaldo(uid, -wager);
+  let nextRoom = null;
+  let failure = '';
+  const joinResult = await roomRef.transaction(current => {
+    if(!current){
+      failure = 'La sala ya no existe.';
+      return;
+    }
+    if(current.status !== 'waiting'){
+      failure = 'La sala ya empezo.';
+      return;
+    }
+    if(current.inviteOnly && current.invitedUid && current.invitedUid !== uid && current.hostUid !== uid){
+      failure = 'Esta sala privada es para otro jugador.';
+      return;
+    }
+    if(Number(current.wager || 0) !== wager){
+      failure = 'La entrada de esa sala ya no coincide.';
+      return;
+    }
+    const currentPlayers = listPlayers(current.players);
+    if(currentPlayers.some(player => player.uid === uid)){
+      nextRoom = current;
+      return current;
+    }
+    if(currentPlayers.length >= 2){
+      failure = 'La sala esta llena.';
+      return;
+    }
+    nextRoom = {
+      ...current,
+      players:{
+        ...(current.players || {}),
+        [uid]:{
+          uid,
+          name:safeName(profile),
+          avatar:safeAvatar(profile),
+          score:0,
+          wager,
+          seat:currentPlayers.length
+        }
+      },
+      pot:wager * (currentPlayers.length + 1),
+      status:'ready',
+      statusText:'Rival encontrado. Preparando partida...',
+      updatedAt:now()
+    };
+    return nextRoom;
+  }, undefined, false);
+
+  if(!joinResult.committed || !nextRoom){
+    await adjustSaldo(uid, wager).catch(() => {});
+    throw new HttpsError('failed-precondition', failure || 'No se pudo entrar a la sala.');
+  }
+  return { room:nextRoom, saldo:Number(profile.saldo || 0) };
+});
+
+exports.updateOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
+  assertAppCheck(request);
+  const uid = requireAuth(request);
+  const roomId = String(request.data?.roomId || '');
+  const patch = request.data?.patch || {};
+  if(!roomId || !patch || typeof patch !== 'object' || Array.isArray(patch)){
+    throw new HttpsError('invalid-argument', 'Actualizacion de sala no valida.');
+  }
+
+  const blocked = ['economySettled', 'economyRewards', 'wager', 'pot', 'hostUid', 'invitedUid', 'inviteOnly', 'createdAt'];
+  if(Object.keys(patch).some(key => blocked.includes(key))){
+    throw new HttpsError('permission-denied', 'Ese campo de sala solo lo modifica el servidor.');
+  }
+
+  const roomRef = db.ref(`onlineRooms/${roomId}`);
+  const snap = await roomRef.get();
+  if(!snap.exists()) throw new HttpsError('not-found', 'Sala no encontrada.');
+  const room = snap.val();
+  assertParticipant(room, uid);
+
+  if(patch.concededBy || patch.status === 'finished'){
+    const players = listPlayers(room.players);
+    const opponent = players.find(player => player.uid !== uid);
+    if(patch.concededBy && (!opponent || patch.concededBy !== uid || patch.winnerUid !== opponent.uid)){
+      throw new HttpsError('permission-denied', 'Abandono online no valido.');
+    }
+  }
+
+  await roomRef.update({
+    ...patch,
+    updatedAt:now()
+  });
+  const nextSnap = await roomRef.get();
+  return { room:nextSnap.exists() ? nextSnap.val() : null };
+});
+
+exports.concedeOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
+  assertAppCheck(request);
+  const uid = requireAuth(request);
+  const roomId = String(request.data?.roomId || '');
+  if(!roomId) throw new HttpsError('invalid-argument', 'Falta sala.');
+
+  const roomRef = db.ref(`onlineRooms/${roomId}`);
+  const snap = await roomRef.get();
+  if(!snap.exists()) return { ok:false };
+  const room = snap.val();
+  if(room.status === 'finished') return { ok:false };
+  assertParticipant(room, uid);
+
+  const players = listPlayers(room.players);
+  const opponent = players.find(player => player.uid !== uid);
+  if(!opponent) return { ok:false };
+
+  await roomRef.update({
+    status:'finished',
+    resolving:false,
+    matchOver:true,
+    turnStartedAt:0,
+    turnDeadlineAt:0,
+    winnerUid:opponent.uid,
+    winnerName:opponent.name || 'Jugador',
+    concededBy:uid,
+    statusText:`${opponent.name || 'Jugador'} gana por abandono`,
+    updatedAt:now()
+  });
+  return { ok:true };
+});
+
+exports.removeOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
+  assertAppCheck(request);
+  const uid = requireAuth(request);
+  const roomId = String(request.data?.roomId || '');
+  if(!roomId) return { ok:false };
+
+  const roomRef = db.ref(`onlineRooms/${roomId}`);
+  const snap = await roomRef.get();
+  if(!snap.exists()) return { ok:false };
+  const room = snap.val();
+  assertParticipant(room, uid);
+  const players = listPlayers(room.players);
+  const hasOpponent = players.some(player => player.uid && player.uid !== uid);
+  if(hasOpponent && room.status !== 'waiting' && room.status !== 'searching'){
+    throw new HttpsError('failed-precondition', 'No se puede borrar una sala activa con rival.');
+  }
+  const wager = Number(room.players?.[uid]?.wager || room.wager || 0);
+  let removedRoom = false;
+  const removeResult = await roomRef.transaction(current => {
+    if(!current) return;
+    const currentPlayers = listPlayers(current.players);
+    const currentHasOpponent = currentPlayers.some(player => player.uid && player.uid !== uid);
+    if(currentHasOpponent && current.status !== 'waiting' && current.status !== 'searching') return;
+    removedRoom = true;
+    return null;
+  }, undefined, false);
+  if(!removeResult.committed || !removedRoom) throw new HttpsError('failed-precondition', 'No se pudo cancelar esa sala.');
+  if(wager > 0 && !room.economySettled){
+    await adjustSaldo(uid, wager);
+  }
+  const profile = await getProfile(uid);
+  return { ok:true, saldo:Number(profile.saldo ?? INITIAL_SALDO) };
+});
+
+exports.processOnlineConcede = onValueCreated('/onlineConcedes/{roomId}/{uid}', async event => {
+  const { roomId, uid } = event.params;
+  const roomRef = db.ref(`onlineRooms/${roomId}`);
+  const snap = await roomRef.get();
+  if(!snap.exists()){
+    await event.data.ref.remove();
+    return;
+  }
+
+  const room = snap.val();
+  if(room.status === 'finished' || !room.players?.[uid]){
+    await event.data.ref.remove();
+    return;
+  }
+
+  const players = listPlayers(room.players);
+  const opponent = players.find(player => player.uid !== uid);
+  if(!opponent){
+    await event.data.ref.remove();
+    return;
+  }
+
+  await roomRef.update({
+    status:'finished',
+    resolving:false,
+    matchOver:true,
+    turnStartedAt:0,
+    turnDeadlineAt:0,
+    winnerUid:opponent.uid,
+    winnerName:opponent.name || 'Jugador',
+    concededBy:uid,
+    statusText:`${opponent.name || 'Jugador'} gana por abandono`,
+    updatedAt:now()
+  });
+  await event.data.ref.remove();
 });

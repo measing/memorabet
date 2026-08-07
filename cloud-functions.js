@@ -28,6 +28,36 @@ export async function settleOnlineRoomServer(roomId){
   return result.data || {};
 }
 
+export async function claimCoinGiftServer(){
+  const result = await callable('claimCoinGift')({});
+  return result.data || {};
+}
+
+export async function createOnlineRoomServer({ mode, wager, invitedUid = '' } = {}){
+  const result = await callable('createOnlineRoom')({ mode, wager, invitedUid });
+  return result.data || {};
+}
+
+export async function joinOnlineRoomServer({ roomId, wager } = {}){
+  const result = await callable('joinOnlineRoom')({ roomId, wager });
+  return result.data || {};
+}
+
+export async function updateOnlineRoomServer(roomId, patch){
+  const result = await callable('updateOnlineRoom')({ roomId, patch });
+  return result.data || {};
+}
+
+export async function concedeOnlineRoomServer(roomId){
+  const result = await callable('concedeOnlineRoom')({ roomId });
+  return result.data || {};
+}
+
+export async function removeOnlineRoomServer(roomId){
+  const result = await callable('removeOnlineRoom')({ roomId });
+  return result.data || {};
+}
+
 export async function deleteAccountServer(){
   const result = await callable('deleteAccount')({});
   return result.data || {};

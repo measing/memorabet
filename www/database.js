@@ -2,6 +2,12 @@ import { ref, get, set, update, push, onValue, query, limitToLast, remove, runTr
 import { db } from './firebase-config.js?v=72';
 import { INITIAL_SALDO, avatarPool } from './constants.js?v=71';
 import { normalizeNickname } from './utils.js?v=71';
+import {
+  createOnlineRoomServer,
+  joinOnlineRoomServer,
+  removeOnlineRoomServer,
+  updateOnlineRoomServer
+} from './cloud-functions.js?v=3';
 
 const LOCAL_HISTORY_KEY = 'memorabetLocalHistory';
 
@@ -490,68 +496,20 @@ export async function findWaitingOnlineRoom(mode, uid, wager = 0){
 }
 
 export async function createOnlineRoom(mode, player, wager = 0, options = {}){
-  const roomRef = push(ref(db, 'onlineRooms'));
-  const entry = Math.max(0, Number(wager || 0));
-  const room = {
-    id: roomRef.key,
+  const result = await createOnlineRoomServer({
     mode,
-    wager: entry,
-    pot: entry,
-    economySettled: false,
-    status: 'waiting',
-    players: {
-      [player.uid]: { ...player, score:0, wager:entry, seat:0 }
-    },
-    current: 0,
-    cards: [],
-    flipped: [],
-    matched: 0,
-    intentos: 0,
-    round: 1,
-    roundWins: [0, 0],
-    suddenDeath: false,
-    suddenDeathStep: 0,
-    suddenDeathLead: -1,
-    matchOver: false,
-    turnStartedAt: 0,
-    turnDurationMs: 10000,
-    turnDeadlineAt: 0,
-    statusText: 'Esperando rival online...',
-    hostUid: player.uid,
-    invitedUid: options.invitedUid || '',
-    inviteOnly: !!options.invitedUid,
-    createdAt: now(),
-    updatedAt: now()
-  };
-  await set(roomRef, room);
-  return room;
+    wager:Math.max(0, Number(wager || 0)),
+    invitedUid:options.invitedUid || ''
+  });
+  return { ...(result.room || {}), saldoAfterEntry:result.saldo };
 }
 
 export async function joinOnlineRoom(roomId, player, wager = 0){
-  const roomRef = ref(db, `onlineRooms/${roomId}`);
-  const snap = await get(roomRef);
-  if(!snap.exists()) throw new Error('La sala ya no existe.');
-  const room = snap.val();
-  if(room.status !== 'waiting') throw new Error('La sala ya empezo.');
-  if(room.inviteOnly && room.invitedUid && room.invitedUid !== player.uid && room.hostUid !== player.uid){
-    throw new Error('Esta sala privada es para otro jugador.');
-  }
-  const entry = Math.max(0, Number(wager || 0));
-  if(Number(room.wager || 0) !== entry) throw new Error('La entrada de esa sala ya no coincide.');
-  const players = listFromFirebase(room.players);
-  if(players.some(item => item.uid === player.uid)) return { id: roomId, ...room };
-  if(players.length >= 2) throw new Error('La sala esta llena.');
-
-  const nextPlayers = [...players, { ...player, score:0, wager:entry, seat:players.length }];
-  const nextPlayersMap = playersToMap(nextPlayers);
-  await update(roomRef, {
-    players: nextPlayersMap,
-    pot: entry * nextPlayers.length,
-    status: 'ready',
-    statusText: 'Rival encontrado. Preparando partida...',
-    updatedAt: now()
+  const result = await joinOnlineRoomServer({
+    roomId,
+    wager:Math.max(0, Number(wager || 0))
   });
-  return { id: roomId, ...room, players: nextPlayersMap, wager:entry, pot:entry * nextPlayers.length, status:'ready' };
+  return { ...(result.room || {}), saldoAfterEntry:result.saldo };
 }
 
 export function listenOnlineRoom(roomId, callback){
@@ -562,8 +520,15 @@ export function listenOnlineRoom(roomId, callback){
 
 export function registerOnlineRoomDisconnect(roomId, patch){
   if(!roomId) return () => {};
-  const disconnectRef = onDisconnect(ref(db, `onlineRooms/${roomId}`));
-  disconnectRef.update({ ...normalizeRoomPatch(patch), updatedAt: now() }).catch(() => {});
+  const uid = String(patch?.concededBy || '');
+  if(!uid) return () => {};
+  const disconnectRef = onDisconnect(ref(db, `onlineConcedes/${roomId}/${uid}`));
+  disconnectRef.set({
+    uid,
+    winnerUid:String(patch?.winnerUid || ''),
+    winnerName:String(patch?.winnerName || 'Jugador').slice(0, 30),
+    t:now()
+  }).catch(() => {});
   return () => disconnectRef.cancel().catch(() => {});
 }
 
@@ -573,11 +538,13 @@ export async function getOnlineRoom(roomId){
 }
 
 export async function updateOnlineRoom(roomId, patch){
-  await update(ref(db, `onlineRooms/${roomId}`), { ...normalizeRoomPatch(patch), updatedAt: now() });
+  const result = await updateOnlineRoomServer(roomId, normalizeRoomPatch(patch));
+  return result.room || null;
 }
 
 export async function removeOnlineRoom(roomId){
-  await remove(ref(db, `onlineRooms/${roomId}`));
+  const result = await removeOnlineRoomServer(roomId);
+  return result || {};
 }
 
 export function listenFriendsBundle(uid, callback){

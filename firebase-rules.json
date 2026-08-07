@@ -6,7 +6,7 @@
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && ((!data.exists() && newData.hasChildren(['nickname', 'cleanNickname', 'email', 'saldo', 'games', 'totalPairs', 'best', 'profit', 'createdAt', 'updatedAt']) && newData.child('saldo').val() === 2000 && newData.child('games').val() === 0 && newData.child('totalPairs').val() === 0 && newData.child('best').val() === 0 && newData.child('profit').val() === 0 && newData.child('createdAt').val() <= now + 300000) || (data.exists() && newData.exists() && newData.child('nickname').val() === data.child('nickname').val() && newData.child('cleanNickname').val() === data.child('cleanNickname').val() && newData.child('email').val() === data.child('email').val() && newData.child('saldo').val() === data.child('saldo').val() && newData.child('coinGiftNextAt').val() === data.child('coinGiftNextAt').val() && newData.child('games').val() === data.child('games').val() && newData.child('totalPairs').val() === data.child('totalPairs').val() && newData.child('best').val() === data.child('best').val() && newData.child('profit').val() === data.child('profit').val() && newData.child('trophies').val() === data.child('trophies').val() && newData.child('cups').val() === data.child('cups').val() && newData.child('medals').val() === data.child('medals').val() && newData.child('silverCups').val() === data.child('silverCups').val() && newData.child('goldCups').val() === data.child('goldCups').val() && newData.child('createdAt').val() === data.child('createdAt').val()))",
         ".validate": "newData.hasChildren(['nickname', 'cleanNickname', 'email', 'saldo', 'games', 'totalPairs', 'best', 'profit', 'createdAt', 'updatedAt'])",
 
         "nickname": {
@@ -234,7 +234,7 @@
       ".read": "auth != null",
       "$roomId": {
         ".read": "auth != null",
-        ".write": "auth != null && (!data.exists() || data.child('inviteOnly').val() != true || data.child('hostUid').val() === auth.uid || data.child('invitedUid').val() === auth.uid || data.child('players').child(auth.uid).exists()) && ((!data.exists() && newData.child('hostUid').val() === auth.uid && newData.child('players').child(auth.uid).exists()) || (data.exists() && data.child('players').child(auth.uid).exists()) || (newData.exists() && newData.child('players').child(auth.uid).exists()))",
+        ".write": false,
         ".validate": "!newData.exists() || (newData.hasChildren(['id', 'mode', 'status', 'players', 'hostUid', 'createdAt', 'updatedAt']) && newData.child('id').val() === $roomId)",
 
         "id": { ".validate": "newData.isString() && newData.val() === $roomId" },
@@ -282,6 +282,21 @@
         "updatedAt": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
         "startedAt": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
         "$other": { ".validate": false }
+      }
+    },
+
+    "onlineConcedes": {
+      "$roomId": {
+        "$uid": {
+          ".read": false,
+          ".write": "auth != null && auth.uid === $uid && root.child('onlineRooms').child($roomId).child('players').child($uid).exists()",
+          ".validate": "!newData.exists() || (newData.hasChildren(['uid', 't']) && newData.child('uid').val() === $uid)",
+          "uid": { ".validate": "newData.isString() && newData.val() === $uid" },
+          "winnerUid": { ".validate": "newData.isString() && newData.val().length <= 128" },
+          "winnerName": { ".validate": "newData.isString() && newData.val().length <= 30" },
+          "t": { ".validate": "newData.isNumber() && newData.val() <= now + 300000" },
+          "$other": { ".validate": false }
+        }
       }
     }
   }
