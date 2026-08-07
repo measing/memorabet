@@ -1,10 +1,10 @@
 import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=89';
-import { claimCoinGift, closeCoinGiftModal, closeGameModePanel, exitGame, openCoinGiftModal, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel, updateCoinGiftButton } from './game.js?v=96';
+import { claimCoinGift, closeCoinGiftModal, closeGameModePanel, exitGame, openCoinGiftModal, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel, updateCoinGiftButton } from './game.js?v=97';
 import { listenLiveHistory, listenLeaderboard } from './database.js?v=84';
 import { session } from './state.js?v=73';
 import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=101';
 import { initAudioControls } from './audio.js?v=73';
-import { initI18n, translatePage } from './i18n.js?v=3';
+import { initI18n, translatePage } from './i18n.js?v=4';
 import { initFriendsFeature, refreshFriendsFeature } from './friends.js?v=5';
 
 window.__memorabetMainLoaded = true;

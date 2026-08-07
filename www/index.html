@@ -14,7 +14,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=3" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png?v=3" />
   <link rel="apple-touch-icon" href="assets/app-icon-192.png?v=3" />
-  <link rel="stylesheet" href="style.css?v=114" />
+  <link rel="stylesheet" href="style.css?v=115" />
 </head>
 <body>
   <div id="mobile-loading-screen" class="mobile-loading-screen" aria-hidden="true">
@@ -207,9 +207,9 @@
               <button class="mode-picker-button" id="btn-mode-picker" type="button">Elegir modo de juego</button>
               <p class="selected-mode-label" id="selected-mode-label"></p>
             </div>
-            <button class="coin-gift-button" id="btn-coin-gift" type="button" aria-label="Reclamar $1.000">
+            <button class="coin-gift-button" id="btn-coin-gift" type="button" aria-label="Reclamar 1000 coins">
               <img src="assets/coin-gift.png" alt="" class="coin-gift-img" draggable="false" />
-              <span class="coin-gift-timer" id="coin-gift-timer">$1.000</span>
+              <span class="coin-gift-timer" id="coin-gift-timer">1000</span>
             </button>
           </div>
           <div class="board" id="board"></div>
@@ -430,9 +430,9 @@
     <div class="coin-gift-box">
       <button class="coin-gift-close" id="coin-gift-close" type="button" aria-label="Cerrar">&times;</button>
       <img src="assets/coin-gift-info.png" alt="" class="coin-gift-info-img" draggable="false" />
-      <h2>Regalo de monedas</h2>
-      <p>Te entregamos $1.000 de saldo ficticio cada 2 horas para que puedas seguir jugando si pierdes tus coins.</p>
-      <button class="coin-gift-claim" id="coin-gift-claim" type="button">Reclamar $1.000</button>
+      <h2>Regalo de coins</h2>
+      <p>Te entregamos 1000 coins cada 2 horas para que puedas seguir jugando si pierdes tus coins.</p>
+      <button class="coin-gift-claim" id="coin-gift-claim" type="button">Reclamar 1000 coins</button>
       <small id="coin-gift-modal-status">Disponible cada 2h</small>
     </div>
   </div>
@@ -481,6 +481,6 @@
       setTimeout(installFallback, isLocalFile ? 800 : 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=127"></script>
+  <script type="module" src="main.js?v=128"></script>
 </body>
 </html>

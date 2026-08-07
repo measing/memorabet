@@ -20,7 +20,7 @@ import {
 } from './database.js?v=84';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
-import { t } from './i18n.js?v=1';
+import { t } from './i18n.js?v=4';
 import { cancelSoloGameServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=1';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
@@ -1286,6 +1286,10 @@ function formatCoinGiftWait(ms){
   return `${seconds}s`;
 }
 
+function formatCoinGiftAmount(){
+  return `${COIN_GIFT_AMOUNT} coins`;
+}
+
 export function updateCoinGiftButton(){
   const button = document.getElementById('btn-coin-gift');
   const claimButton = document.getElementById('coin-gift-claim');
@@ -1301,7 +1305,7 @@ export function updateCoinGiftButton(){
   if(claimButton) claimButton.disabled = !ready;
   button.setAttribute('aria-label', ready ? t('coinGift.title') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) }));
   button.title = ready ? t('coinGift.title') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) });
-  timer.textContent = ready ? '$1.000' : formatCoinGiftWait(remaining);
+  timer.textContent = ready ? '1000' : formatCoinGiftWait(remaining);
   if(modalStatus) modalStatus.textContent = ready ? t('coinGift.ready') : t('coinGift.wait', { time:formatCoinGiftWait(remaining) });
 }
 
@@ -1348,7 +1352,7 @@ export async function claimCoinGift(){
   updateStats();
   updateCoinGiftButton();
   closeCoinGiftModal();
-  showMsg(t('coinGift.claimed', { amount:formatMoney(COIN_GIFT_AMOUNT) }), 'success');
+  showMsg(t('coinGift.claimed', { amount:formatCoinGiftAmount() }), 'success');
 }
 
 function updateGuestStats({ pares, net }){
