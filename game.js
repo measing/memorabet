@@ -1,6 +1,6 @@
 import { ANIMAL_CARDS, K_MAX, TOTAL_PAIRS, G, C, ONLINE_WAGERS, ONLINE_WIN_CUPS, ONLINE_LOSE_CUPS } from './constants.js?v=72';
 import { createLocalDuelState, gameState, session } from './state.js?v=73';
-import { shuffle, wait, formatMoney } from './utils.js?v=71';
+import { shuffle, wait, formatMoney } from './utils.js?v=72';
 import {
   getUserProfile,
   findWaitingOnlineRoom,
@@ -14,7 +14,7 @@ import {
 } from './database.js?v=85';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
-import { t } from './i18n.js?v=4';
+import { t } from './i18n.js?v=5';
 import { cancelSoloGameServer, claimCoinGiftServer, concedeOnlineRoomServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=3';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';

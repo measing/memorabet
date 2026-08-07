@@ -1,5 +1,5 @@
 import { session } from './state.js?v=73';
-import { escapeHTML, formatMoney } from './utils.js?v=71';
+import { escapeHTML, formatMoney } from './utils.js?v=72';
 import { ONLINE_WAGERS } from './constants.js?v=72';
 import {
   acceptFriendRequest,

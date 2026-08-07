@@ -1,8 +1,8 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
 import { gameState, session } from './state.js?v=73';
-import { escapeHTML, formatMoney } from './utils.js?v=71';
+import { escapeHTML, formatMoney } from './utils.js?v=72';
 import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=83';
-import { t } from './i18n.js?v=1';
+import { t } from './i18n.js?v=5';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
 const AVATARS = Array.from({ length: 37 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);

@@ -1,7 +1,7 @@
 import { ref, get, set, update, push, onValue, query, limitToLast, remove, runTransaction, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 import { db } from './firebase-config.js?v=72';
 import { INITIAL_SALDO, avatarPool } from './constants.js?v=71';
-import { normalizeNickname } from './utils.js?v=71';
+import { normalizeNickname } from './utils.js?v=72';
 import {
   createOnlineRoomServer,
   joinOnlineRoomServer,
