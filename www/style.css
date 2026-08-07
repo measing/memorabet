@@ -1153,11 +1153,15 @@ body.account-connected .start-auth-actions{
   cursor:pointer;
 }
 .coin-gift-info-img{
-  width:100%;
-  max-height:min(340px, 48vh);
+  display:block;
+  width:calc(100% + 40px);
+  max-width:none;
+  height:auto;
+  max-height:none;
+  margin:-20px -20px 0;
   object-fit:contain;
-  object-position:center center;
-  background:linear-gradient(180deg, rgba(11,13,22,.98), rgba(6,7,11,.98));
+  object-position:center top;
+  background:transparent;
   border-radius:12px;
   border:1px solid rgba(249,199,79,.34);
 }
