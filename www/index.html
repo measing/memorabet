@@ -14,7 +14,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=3" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png?v=3" />
   <link rel="apple-touch-icon" href="assets/app-icon-192.png?v=3" />
-  <link rel="stylesheet" href="style.css?v=115" />
+  <link rel="stylesheet" href="style.css?v=118" />
 </head>
 <body>
   <div id="mobile-loading-screen" class="mobile-loading-screen" aria-hidden="true">
@@ -163,6 +163,11 @@
             </div>
           </section>
 
+          <button class="coin-gift-button" id="btn-coin-gift" type="button" aria-label="Reclamar 1000 coins">
+            <img src="assets/coin-gift.png" alt="" class="coin-gift-img" draggable="false" />
+            <span class="coin-gift-timer" id="coin-gift-timer">1000</span>
+          </button>
+
           <div class="game-toolbar-actions">
             <div class="balance-chip" aria-label="Dinero disponible"><span class="coin-icon">$</span> <strong id="ganancia">$2.000</strong></div>
             <button class="toolbar-icon-button" id="btn-change-user" type="button" aria-label="Configuración">&#9881;&#65039;</button>
@@ -207,10 +212,6 @@
               <button class="mode-picker-button" id="btn-mode-picker" type="button">Elegir modo de juego</button>
               <p class="selected-mode-label" id="selected-mode-label"></p>
             </div>
-            <button class="coin-gift-button" id="btn-coin-gift" type="button" aria-label="Reclamar 1000 coins">
-              <img src="assets/coin-gift.png" alt="" class="coin-gift-img" draggable="false" />
-              <span class="coin-gift-timer" id="coin-gift-timer">1000</span>
-            </button>
           </div>
           <div class="board" id="board"></div>
         </section>

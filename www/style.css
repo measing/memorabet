@@ -711,6 +711,7 @@ body::before{
 .screen-view.active{display:flex}
 .game-view{flex-direction:column;align-items:center}
 .game-toolbar{
+  position:relative;
   width:min(820px,92vw);
   margin:0 auto 14px;
   display:flex;
@@ -1032,9 +1033,9 @@ body.account-connected .start-auth-actions{
 .coin-gift-button{
   pointer-events:auto;
   position:absolute;
-  right:clamp(18px, 5vw, 62px);
-  top:clamp(96px, 18%, 140px);
-  width:clamp(78px, 8.4vw, 118px);
+  left:12px;
+  top:calc(100% + 10px);
+  width:clamp(70px, 7.4vw, 98px);
   aspect-ratio:1;
   display:grid;
   place-items:center;
@@ -1045,12 +1046,15 @@ body.account-connected .start-auth-actions{
   color:#fff;
   cursor:pointer;
   filter:drop-shadow(0 10px 18px rgba(0,0,0,.55)) drop-shadow(0 0 16px rgba(73,176,255,.28));
-  transform:translateY(-50%);
-  z-index:6;
+  transform:none;
+  z-index:8;
 }
 .coin-gift-button:hover:not(:disabled){
-  transform:translateY(-50%) scale(1.05);
+  transform:scale(1.05);
   filter:drop-shadow(0 12px 22px rgba(0,0,0,.62)) drop-shadow(0 0 22px rgba(73,176,255,.42));
+}
+.game-round-active .coin-gift-button{
+  display:none;
 }
 .coin-gift-button.waiting{
   filter:grayscale(.25) brightness(.74) drop-shadow(0 8px 14px rgba(0,0,0,.55));
@@ -1791,10 +1795,10 @@ body.online-duel-active #btn-exit{
   }
   .coin-gift-button{
     position:fixed;
-    left:clamp(28px, 7vw, 42px);
+    left:clamp(30px, 8vw, 46px);
     right:auto;
-    top:calc(env(safe-area-inset-top, 0px) + 126px);
-    width:clamp(58px, 16vw, 72px);
+    top:calc(env(safe-area-inset-top, 0px) + 112px);
+    width:clamp(58px, 15vw, 70px);
     z-index:70;
     transform:none;
   }
@@ -1985,7 +1989,7 @@ body.online-duel-active #btn-exit{
   .casino-menu{grid-template-columns:repeat(2,minmax(0,1fr))}
   .board{grid-template-columns:repeat(4,minmax(62px,1fr));gap:7px}
   .start-game-button{min-width:min(280px,86vw);font-size:20px}
-  .coin-gift-button{width:58px;left:24px;right:auto}
+  .coin-gift-button{width:58px;left:26px;right:auto;top:calc(env(safe-area-inset-top, 0px) + 108px)}
   .hud-cell{flex-direction:column;gap:3px}
   .bottom-hud{gap:7px}
 }
