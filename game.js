@@ -1,6 +1,6 @@
 import { ANIMAL_CARDS, K_MAX, TOTAL_PAIRS, G, C, ONLINE_WAGERS, ONLINE_WIN_CUPS, ONLINE_LOSE_CUPS } from './constants.js?v=72';
 import { createLocalDuelState, gameState, session } from './state.js?v=73';
-import { shuffle, wait, formatMoney } from './utils.js?v=72';
+import { shuffle, wait, formatMoney } from './utils.js?v=73';
 import {
   getUserProfile,
   findWaitingOnlineRoom,
@@ -10,12 +10,13 @@ import {
   registerOnlineRoomDisconnect,
   getOnlineRoom,
   updateOnlineRoom,
-  removeOnlineRoom
-} from './database.js?v=85';
+  removeOnlineRoom,
+  claimCoinGift as claimCoinGiftDb
+} from './database.js?v=86';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=5';
-import { cancelSoloGameServer, claimCoinGiftServer, concedeOnlineRoomServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=3';
+import { cancelSoloGameServer, concedeOnlineRoomServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=3';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -1293,10 +1294,10 @@ export async function claimCoinGift(){
     localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
     saveGuestBalance();
   }else{
-    const result = await claimCoinGiftServer();
-    const nextClaimAt = Number(result.coinGiftNextAt || 0);
+    const result = await claimCoinGiftDb(uid, COIN_GIFT_AMOUNT, COIN_GIFT_COOLDOWN_MS);
+    const nextClaimAt = Number(result.profile?.coinGiftNextAt || 0);
     if(nextClaimAt) localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
-    if(Number.isFinite(Number(result.saldo))) gameState.saldo = Number(result.saldo);
+    if(Number.isFinite(Number(result.profile?.saldo))) gameState.saldo = Number(result.profile.saldo);
     if(!result.ok){
       updateStats();
       updateCoinGiftButton();

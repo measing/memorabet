@@ -15,3 +15,4 @@ android/key.properties
 android/*UPLOAD_KEY_INFO*.txt
 firebase-debug.log
 firebase-debug.*.log
+.firebase/

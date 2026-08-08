@@ -1,7 +1,7 @@
 import { ref, get, set, update, push, onValue, query, limitToLast, remove, runTransaction, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 import { db } from './firebase-config.js?v=72';
 import { INITIAL_SALDO, avatarPool } from './constants.js?v=71';
-import { normalizeNickname } from './utils.js?v=72';
+import { normalizeNickname } from './utils.js?v=73';
 import {
   createOnlineRoomServer,
   joinOnlineRoomServer,
@@ -259,6 +259,28 @@ export async function updateCoinGift(uid, saldo, coinGiftNextAt){
     coinGiftNextAt,
     updatedAt: now()
   });
+}
+
+export async function claimCoinGift(uid, amount, cooldownMs){
+  const userRef = ref(db, `users/${uid}`);
+  const claimedAt = now();
+  const result = await runTransaction(userRef, profile => {
+    if(!profile) return profile;
+    const currentSaldo = Number(profile.saldo ?? INITIAL_SALDO);
+    const nextAllowedAt = Number(profile.coinGiftNextAt || 0);
+    if(nextAllowedAt > claimedAt) return;
+    return {
+      ...profile,
+      saldo: currentSaldo + Number(amount || 0),
+      coinGiftNextAt: claimedAt + Number(cooldownMs || 0),
+      updatedAt: claimedAt
+    };
+  }, { applyLocally:false });
+
+  return {
+    ok: result.committed,
+    profile: result.snapshot?.val() || null
+  };
 }
 
 async function updatePublicAvatar(uid, avatar){

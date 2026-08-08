@@ -1,6 +1,6 @@
 # MemoraBet - checklist para Google Play Console
 
-Ultima actualizacion: 6 de agosto de 2026.
+Ultima actualizacion: 7 de agosto de 2026.
 
 ## Estado tecnico
 
@@ -31,7 +31,7 @@ MemoraBet
 Descripcion corta:
 
 ```text
-Juego de memoria con duelos, ranking y saldo ficticio. Sin dinero real.
+Juego de memoria con duelos, ranking y Coins ficticias. Sin dinero real.
 ```
 
 Descripcion larga:
@@ -45,9 +45,9 @@ El objetivo es encontrar parejas, memorizar movimientos y competir en diferentes
 - Duelo de pares.
 - Duelo de memoria.
 - Ranking e historial.
-- Tienda de cartas con saldo ficticio.
+- Tienda de cartas con Coins ficticias.
 
-MemoraBet no usa dinero real, no permite apuestas reales y no entrega premios reales. Todo saldo, copa, medalla o recompensa dentro del juego es ficticio y solo sirve para la experiencia del juego.
+MemoraBet no usa dinero real, no permite apuestas reales y no entrega premios reales. Toda Coin, copa, medalla o recompensa dentro del juego es ficticia y solo sirve para la experiencia del juego.
 ```
 
 Categoria sugerida:
@@ -67,7 +67,7 @@ soporte@memorabet.site
 Datos que puede declarar:
 
 - Informacion personal: correo electronico, identificador de usuario, nickname.
-- Actividad en la app: ranking, historial, partidas, progreso, saldo ficticio.
+- Actividad en la app: ranking, historial, partidas, progreso, Coins ficticias.
 - Identificadores: Firebase Auth UID.
 
 Uso de datos:
@@ -79,19 +79,46 @@ Uso de datos:
 
 Compartido con terceros:
 
-- Firebase/Google procesa los datos necesarios para autenticacion, base de datos y funciones.
+- Firebase/Google procesa los datos necesarios para autenticacion y base de datos como proveedor tecnico.
+- MemoraBet no vende datos personales.
 
 Eliminacion de datos:
 
 - Disponible dentro de la app en Configuracion > Eliminar cuenta.
 - Disponible por web en `https://memorabet.site/eliminar-cuenta.html`.
 
+Texto util para Play Console:
+
+```text
+MemoraBet recopila datos necesarios para crear cuenta, guardar progreso, rankings, historial, Coins ficticias y partidas online. Los datos se usan para funcionamiento de la app, administracion de cuenta, seguridad, prevencion de abuso y sincronizacion del juego. MemoraBet no vende datos personales. La eliminacion de cuenta esta disponible dentro de la app y en https://memorabet.site/eliminar-cuenta.html.
+```
+
 ## Politica de dinero real
 
 Declarar claramente:
 
 ```text
-MemoraBet no usa dinero real, no permite apuestas con dinero real y no entrega premios reales. Todo saldo o recompensa es ficticio.
+MemoraBet no usa dinero real, no permite apuestas con dinero real y no entrega premios reales. Todas las Coins, recompensas, copas y medallas son ficticias y no se pueden comprar, vender, retirar, canjear ni intercambiar por dinero o bienes reales.
+```
+
+## Clasificacion de contenido
+
+Respuestas sugeridas para el cuestionario:
+
+- Categoria: juego casual/cartas/memoria.
+- Dinero real: no.
+- Apuestas con dinero real: no.
+- Premios reales: no.
+- Compras dentro de la app: no, si no activas pagos reales.
+- Publicidad: no, si no agregas anuncios.
+- Interaccion online: si, por duelos, amigos, ranking e historial online.
+- Contenido generado por usuarios: limitado a nickname/avatar; revisar que nicknames no acepten HTML o JavaScript.
+- Tematica de casino: si el cuestionario pregunta por casino o juegos de azar simulados, declararlo como estetica/tematica ficticia sin dinero real.
+
+Texto corto para notas de revision:
+
+```text
+MemoraBet usa estetica de casino solo como ambientacion visual. No permite apostar dinero real, no vende Coins, no permite retirar recompensas y no entrega premios reales. Las Coins son ficticias y sirven unicamente para progresar dentro del juego.
 ```
 
 ## Pruebas antes de enviar

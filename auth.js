@@ -12,7 +12,7 @@ import {
 import { auth } from './firebase-config.js?v=72';
 import { INITIAL_SALDO, forbiddenNames } from './constants.js?v=71';
 import { session, gameState, resetGameState } from './state.js?v=73';
-import { normalizeNickname, escapeHTML } from './utils.js?v=72';
+import { normalizeNickname, escapeHTML } from './utils.js?v=73';
 import {
   nicknameTaken,
   reserveNickname,
@@ -336,7 +336,7 @@ async function deleteCurrentAccount(){
     showSettingsStatus('Inicia sesion para eliminar una cuenta.', 'danger');
     return;
   }
-  const ok = window.confirm('Esto eliminara tu cuenta MemoraBet, saldo ficticio, historial, rankings y perfil. Esta accion no se puede deshacer. ¿Continuar?');
+  const ok = window.confirm('Esto eliminara tu cuenta MemoraBet, Coins ficticias, historial, rankings y perfil. Esta accion no se puede deshacer. ¿Continuar?');
   if(!ok) return;
 
   showSettingsStatus('Eliminando cuenta...', 'info');

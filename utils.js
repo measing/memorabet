@@ -7,7 +7,7 @@ export function normalizeNickname(name){
 }
 
 export function formatMoney(n){
-  return `${Number(n || 0).toLocaleString('es-CL')} Coins`;
+  return Number(n || 0).toLocaleString('es-CL');
 }
 
 export function wait(ms){
