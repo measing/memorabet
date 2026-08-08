@@ -16,11 +16,11 @@ import {
   addLiveHistory,
   addLeaderboardEntry,
   claimCoinGift as claimCoinGiftDb
-} from './database.js?v=88';
+} from './database.js?v=89';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=5';
-import { cancelSoloGameServer, concedeOnlineRoomServer, finishSoloGameServer, settleOnlineRoomServer, startSoloGameServer } from './cloud-functions.js?v=3';
+import { cancelSoloGameServer, finishSoloGameServer, startSoloGameServer } from './cloud-functions.js?v=3';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -201,7 +201,11 @@ function getOnlineWinner(room){
 async function settleOnlineEconomy(room){
   const freshRoom = await getOnlineRoom(room.id);
   if(!freshRoom || freshRoom.economySettled || freshRoom.status !== 'finished') return null;
-  return settleOnlineRoomServer(freshRoom.id);
+  await updateOnlineRoom(freshRoom.id, {
+    economySettled:true,
+    economyRewards:{ clientOnly:true }
+  });
+  return null;
 }
 
 function requestOnlineEconomySettlement(room){
@@ -1086,7 +1090,17 @@ async function concedeOnlineRoom(){
   const opponent = players.find(player => player.uid !== myUid);
   if(myIndex < 0 || !opponent) return false;
 
-  await concedeOnlineRoomServer(roomId);
+  await updateOnlineRoom(roomId, {
+    status:'finished',
+    resolving:false,
+    matchOver:true,
+    turnStartedAt:0,
+    turnDeadlineAt:0,
+    winnerUid:opponent.uid,
+    winnerName:opponent.name || 'Jugador',
+    concededBy:myUid || '',
+    statusText:`${opponent.name || 'Jugador'} gana por abandono`
+  });
   return true;
 }
 
