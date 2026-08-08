@@ -60,7 +60,10 @@ function isGuestUser(){
 function shouldUseLocalSoloFallback(error){
   const code = String(error?.code || '');
   const message = String(error?.message || '');
-  return !code || code.startsWith('functions/') || /function|internal|unavailable|not-found|network|fetch|cors/i.test(message);
+  return !code
+    || code.startsWith('functions/')
+    || /internal|unavailable|not-found|deadline-exceeded|network-request-failed/i.test(code)
+    || /function|internal|unavailable|not-found|network|fetch|cors/i.test(message);
 }
 
 async function startSoloLocalFallback(){
@@ -1349,6 +1352,16 @@ export async function claimCoinGift(){
     let result = null;
     try{
       result = await claimCoinGiftDb(uid, COIN_GIFT_AMOUNT, COIN_GIFT_COOLDOWN_MS);
+      if(!result?.ok){
+        const serverNextAt = Number(result?.profile?.coinGiftNextAt || 0);
+        if(serverNextAt > Date.now()){
+          localStorage.setItem(getCoinGiftStorageKey(), String(serverNextAt));
+          updateCoinGiftButton();
+          showMsg(t('coinGift.wait', { time:formatCoinGiftWait(serverNextAt - Date.now()) }), 'warning');
+          return;
+        }
+        throw new Error('coin-gift-not-committed');
+      }
     }catch(error){
       console.warn('MemoraBet coin gift failed:', error);
       const fallbackSaldo = Number(profile?.saldo ?? gameState.saldo) + COIN_GIFT_AMOUNT;
