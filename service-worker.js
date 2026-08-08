@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-web-v150';
+const CACHE_NAME = 'memorabet-web-v151';
 
 const LOCAL_ASSETS = [
   './',
@@ -53,6 +53,11 @@ const LOCAL_ASSETS = [
   './assets/card-backs/skin-inferno.png?v=2',
   './assets/card-backs/skin-radiant.png?v=2',
   './assets/card-backs/skin-tech.png?v=2',
+  './assets/card-backs/skin-solar.png?v=1',
+  './assets/card-backs/skin-venom.png?v=1',
+  './assets/card-backs/skin-frost.png?v=1',
+  './assets/card-backs/skin-nature.png?v=1',
+  './assets/card-backs/skin-banana.png?v=1',
   './assets/sounds/rival-found.mp3',
   './assets/sounds/casino-vip-7.mp3',
   './assets/sounds/we-will-empty-this-casino.mp3',

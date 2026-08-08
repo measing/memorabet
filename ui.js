@@ -1,8 +1,8 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
 import { gameState, session } from './state.js?v=73';
 import { escapeHTML, formatMoney } from './utils.js?v=73';
-import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=83';
-import { t } from './i18n.js?v=5';
+import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=89';
+import { t } from './i18n.js?v=6';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
 const AVATARS = Array.from({ length: 37 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
@@ -19,7 +19,12 @@ const CARD_SKINS = [
   { id:'royal', nameKey:'store.royal', price:15000, src:'assets/card-backs/skin-royal.png?v=2' },
   { id:'inferno', nameKey:'store.inferno', price:15000, src:'assets/card-backs/skin-inferno.png?v=2' },
   { id:'radiant', nameKey:'store.radiant', price:15000, src:'assets/card-backs/skin-radiant.png?v=2' },
-  { id:'tech', nameKey:'store.tech', price:15000, src:'assets/card-backs/skin-tech.png?v=2' }
+  { id:'tech', nameKey:'store.tech', price:15000, src:'assets/card-backs/skin-tech.png?v=2' },
+  { id:'solar', nameKey:'store.solar', price:25000, src:'assets/card-backs/skin-solar.png?v=1' },
+  { id:'venom', nameKey:'store.venom', price:25000, src:'assets/card-backs/skin-venom.png?v=1' },
+  { id:'frost', nameKey:'store.frost', price:25000, src:'assets/card-backs/skin-frost.png?v=1' },
+  { id:'nature', nameKey:'store.nature', price:25000, src:'assets/card-backs/skin-nature.png?v=1' },
+  { id:'banana', nameKey:'store.banana', price:50000, src:'assets/card-backs/skin-banana.png?v=1' }
 ];
 let selectedRankingBoard = 'solo';
 

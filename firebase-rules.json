@@ -25,7 +25,7 @@
           ".validate": true
         },
         "selectedCardSkin": {
-          ".validate": "newData.isString() && newData.val().matches(/^(default|galaxy|arcane|forest|storm|royal|inferno|radiant|tech)$/)"
+          ".validate": "newData.isString() && newData.val().matches(/^(default|galaxy|arcane|forest|storm|royal|inferno|radiant|tech|solar|venom|frost|nature|banana)$/)"
         },
         "saldo": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
