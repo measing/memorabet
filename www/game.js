@@ -11,8 +11,11 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom,
+  updateUserStats,
+  addLiveHistory,
+  addLeaderboardEntry,
   claimCoinGift as claimCoinGiftDb
-} from './database.js?v=86';
+} from './database.js?v=87';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=5';
@@ -53,15 +56,61 @@ function isGuestUser(){
 }
 
 function shouldUseLocalSoloFallback(error){
-  return false;
+  const code = String(error?.code || '');
+  const message = String(error?.message || '');
+  return !code || code.startsWith('functions/') || /function|internal|unavailable|not-found|network|fetch|cors/i.test(message);
 }
 
 async function startSoloLocalFallback(){
-  throw new Error('Las partidas seguras requieren Firebase Functions desplegadas.');
+  const uid = session.currentUser?.uid;
+  if(!uid) throw new Error('Inicia sesion para guardar la partida.');
+  const nextSaldo = Math.max(0, Number(gameState.saldo || 0) - C);
+  gameState.saldo = nextSaldo;
+  gameState.soloSessionId = LOCAL_SOLO_SESSION_ID;
 }
 
 async function finishSoloLocalFallback({ tiempoMs, premioRanking }){
-  throw new Error('Los resultados seguros requieren Firebase Functions desplegadas.');
+  const uid = session.currentUser?.uid;
+  if(!uid) return null;
+  const avatar = getSelectedAvatar();
+  let updated = {
+    ...(session.currentUser || {}),
+    saldo: gameState.saldo,
+    games: Number(session.currentUser?.games || 0) + 1,
+    totalPairs: Number(session.currentUser?.totalPairs || 0) + gameState.matched,
+    best: Math.max(Number(session.currentUser?.best || 0), gameState.matched),
+    profit: Number(session.currentUser?.profit || 0) + gameState.gananciaPartida
+  };
+  try{
+    updated = await updateUserStats(uid, {
+      pares: gameState.matched,
+      net: gameState.gananciaPartida,
+      saldo: gameState.saldo
+    });
+  }catch(error){
+    console.warn('MemoraBet secure solo save skipped:', error);
+  }
+  const user = updated.nickname || session.currentUser?.nickname || 'Jugador';
+  await addLiveHistory({
+    uid,
+    user,
+    pares: gameState.matched,
+    intentos: gameState.intentos,
+    net: gameState.gananciaPartida,
+    avatar
+  }).catch(error => console.warn('MemoraBet history fallback failed:', error));
+  if(gameState.matched === TOTAL_PAIRS){
+    await addLeaderboardEntry({
+      uid,
+      user,
+      tiempoMs,
+      intentos: gameState.intentos,
+      pares: gameState.matched,
+      premio: premioRanking,
+      avatar
+    }).catch(error => console.warn('MemoraBet ranking fallback failed:', error));
+  }
+  return updated;
 }
 
 function isOnlineDuelActive(){
@@ -1294,7 +1343,16 @@ export async function claimCoinGift(){
     localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
     saveGuestBalance();
   }else{
-    const result = await claimCoinGiftDb(uid, COIN_GIFT_AMOUNT, COIN_GIFT_COOLDOWN_MS);
+    let result = null;
+    try{
+      result = await claimCoinGiftDb(uid, COIN_GIFT_AMOUNT, COIN_GIFT_COOLDOWN_MS);
+    }catch(error){
+      console.warn('MemoraBet coin gift failed:', error);
+      updateStats();
+      updateCoinGiftButton();
+      showMsg('No se pudo cobrar el regalo. Cierra sesion, vuelve a entrar y prueba otra vez.', 'danger');
+      return;
+    }
     const nextClaimAt = Number(result.profile?.coinGiftNextAt || 0);
     if(nextClaimAt) localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
     if(Number.isFinite(Number(result.profile?.saldo))) gameState.saldo = Number(result.profile.saldo);
@@ -1688,7 +1746,10 @@ export async function startOnlineGame(mode = 'classic', options = {}){
     setNewGameButtonBusy(false);
     clearBoard();
     updateStats();
-    showMsg(error?.message || 'No se pudo entrar a una sala online.', 'danger');
+    const message = shouldUseLocalSoloFallback(error)
+      ? 'El modo online necesita Firebase Functions desplegadas para proteger salas, resultados y coins.'
+      : (error?.message || 'No se pudo entrar a una sala online.');
+    showMsg(message, 'danger');
     return null;
   }
 }
@@ -1712,11 +1773,24 @@ export async function joinOnlineGameByRoom(roomId){
 }
 
 export async function startSelectedGame(){
-  if(selectedGameMode === 'duel') await newLocalDuel();
-  else if(selectedGameMode === 'memory-duel') await newMemoryDuel();
-  else if(selectedGameMode === 'online-duel') await startOnlineGame('classic');
-  else if(selectedGameMode === 'online-memory-duel') await startOnlineGame('memory');
-  else await newGame();
+  try{
+    if(selectedGameMode === 'duel') await newLocalDuel();
+    else if(selectedGameMode === 'memory-duel') await newMemoryDuel();
+    else if(selectedGameMode === 'online-duel') await startOnlineGame('classic');
+    else if(selectedGameMode === 'online-memory-duel') await startOnlineGame('memory');
+    else await newGame();
+  }catch(error){
+    console.warn('MemoraBet start game failed:', error);
+    gameState.starting = false;
+    gameState.blocked = false;
+    setNewGameButtonBusy(false);
+    updateStats();
+    const raw = String(error?.message || error?.code || '');
+    const message = /internal|functions|not-found|unavailable/i.test(raw)
+      ? 'No se pudo conectar con el servidor de partidas. Prueba modo invitado o vuelve a iniciar sesion.'
+      : (raw || 'No se pudo iniciar el juego.');
+    showMsg(message, 'danger');
+  }
 }
 
 export function flipCard(id){
@@ -1860,7 +1934,7 @@ export async function endGame(){
     try{
       let updated = null;
       if(gameState.soloSessionId === LOCAL_SOLO_SESSION_ID){
-        await finishSoloLocalFallback({ tiempoMs, premioRanking });
+        updated = await finishSoloLocalFallback({ tiempoMs, premioRanking });
       }else{
         updated = await finishSoloGameServer({
           sessionId: gameState.soloSessionId,
@@ -1877,8 +1951,12 @@ export async function endGame(){
     }catch(error){
       if(shouldUseLocalSoloFallback(error)){
         try{
-          await finishSoloLocalFallback({ tiempoMs, premioRanking });
+          const updated = await finishSoloLocalFallback({ tiempoMs, premioRanking });
           gameState.soloSessionId = null;
+          if(updated){
+            if(Number.isFinite(Number(updated.saldo))) gameState.saldo = Number(updated.saldo);
+            renderUserStats(updated);
+          }
         }catch(fallbackError){
           showMsg(fallbackError?.message || 'No se pudo guardar la partida.', 'danger');
         }

@@ -264,6 +264,7 @@ export async function updateCoinGift(uid, saldo, coinGiftNextAt){
 export async function claimCoinGift(uid, amount, cooldownMs){
   const userRef = ref(db, `users/${uid}`);
   const claimedAt = now();
+  const serverClockSafetyMs = 60000;
   const result = await runTransaction(userRef, profile => {
     if(!profile) return profile;
     const currentSaldo = Number(profile.saldo ?? INITIAL_SALDO);
@@ -272,7 +273,7 @@ export async function claimCoinGift(uid, amount, cooldownMs){
     return {
       ...profile,
       saldo: currentSaldo + Number(amount || 0),
-      coinGiftNextAt: claimedAt + Number(cooldownMs || 0),
+      coinGiftNextAt: claimedAt + Number(cooldownMs || 0) + serverClockSafetyMs,
       updatedAt: claimedAt
     };
   }, { applyLocally:false });
