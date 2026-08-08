@@ -175,6 +175,22 @@ function renderCardSkinStore(){
       }
       if(!result?.ok || !result.profile){
         btn.disabled = false;
+        if(result?.profile){
+          const serverOwned = Array.isArray(result.profile.ownedCardSkins) ? result.profile.ownedCardSkins : [];
+          const serverSaldo = Number(result.profile.saldo ?? gameState.saldo);
+          gameState.saldo = serverSaldo;
+          setOwnedCardSkins(serverOwned);
+          session.currentUser.selectedCardSkin = result.profile.selectedCardSkin || DEFAULT_CARD_SKIN_ID;
+          localStorage.setItem(getCardSkinStorageKey(CARD_SKIN_SELECTED_KEY), session.currentUser.selectedCardSkin);
+          updateStats();
+          applySelectedCardSkin();
+          renderCardSkinStore();
+          renderUserStats(result.profile);
+          if(!serverOwned.includes(skin.id) && serverSaldo < skin.price){
+            showStoreStatus(t('store.noMoney', { price:formatMoney(skin.price) }), 'danger');
+            return;
+          }
+        }
         showStoreStatus(t('store.purchaseFailed'), 'danger');
         return;
       }
