@@ -1,8 +1,8 @@
 import { K_MAX, TOTAL_PAIRS, C } from './constants.js?v=71';
 import { gameState, session } from './state.js?v=73';
 import { escapeHTML, formatMoney } from './utils.js?v=73';
-import { updateSaldo, updateUserAvatar, updateUserCardSkins } from './database.js?v=89';
-import { t } from './i18n.js?v=6';
+import { purchaseCardSkin, updateUserAvatar, updateUserCardSkins } from './database.js?v=90';
+import { t } from './i18n.js?v=7';
 
 const AVATAR_STORAGE_KEY = 'memorabetSelectedAvatar';
 const AVATARS = Array.from({ length: 37 }, (_, i) => `assets/avatars/avatar-${String(i + 1).padStart(2, '0')}.png`);
@@ -166,13 +166,28 @@ function renderCardSkinStore(){
         return;
       }
 
-      gameState.saldo -= skin.price;
-      await updateSaldo(session.currentUser.uid, gameState.saldo);
-      currentOwned.push(skin.id);
-      await saveCardSkinState(currentOwned, skin.id);
+      btn.disabled = true;
+      let result = null;
+      try{
+        result = await purchaseCardSkin(session.currentUser.uid, skin.id, skin.price);
+      }catch(error){
+        console.warn('MemoraBet skin purchase failed:', error);
+      }
+      if(!result?.ok || !result.profile){
+        btn.disabled = false;
+        showStoreStatus(t('store.purchaseFailed'), 'danger');
+        return;
+      }
+
+      const profileOwned = Array.isArray(result.profile.ownedCardSkins) ? result.profile.ownedCardSkins : [...currentOwned, skin.id];
+      gameState.saldo = Number(result.profile.saldo ?? gameState.saldo);
+      setOwnedCardSkins(profileOwned);
+      session.currentUser.selectedCardSkin = result.profile.selectedCardSkin || skin.id;
+      localStorage.setItem(getCardSkinStorageKey(CARD_SKIN_SELECTED_KEY), session.currentUser.selectedCardSkin);
       updateStats();
       applySelectedCardSkin();
       renderCardSkinStore();
+      renderUserStats(result.profile);
       showStoreStatus(t('store.bought', { name:t(skin.nameKey) }), 'success');
     });
   });

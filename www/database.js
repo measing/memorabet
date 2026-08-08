@@ -247,6 +247,37 @@ export async function updateSaldo(uid, saldo){
   await update(ref(db, `users/${uid}`), { saldo, updatedAt: now() });
 }
 
+export async function purchaseCardSkin(uid, skinId, price){
+  const cleanSkinId = String(skinId || '');
+  const cost = Math.max(0, Number(price || 0));
+  const userRef = ref(db, `users/${uid}`);
+  const result = await runTransaction(userRef, profile => {
+    if(!profile) return profile;
+    const owned = Array.isArray(profile.ownedCardSkins) ? profile.ownedCardSkins : [];
+    if(owned.includes(cleanSkinId)){
+      return {
+        ...profile,
+        selectedCardSkin:cleanSkinId,
+        updatedAt:now()
+      };
+    }
+    const saldo = Number(profile.saldo ?? INITIAL_SALDO);
+    if(saldo < cost) return;
+    return {
+      ...profile,
+      saldo:saldo - cost,
+      ownedCardSkins:[...new Set([...owned, cleanSkinId])],
+      selectedCardSkin:cleanSkinId,
+      updatedAt:now()
+    };
+  }, { applyLocally:false });
+
+  return {
+    ok:result.committed,
+    profile:result.snapshot?.val() || null
+  };
+}
+
 export async function updateCoinGift(uid, saldo, coinGiftNextAt){
   await update(ref(db, `users/${uid}`), {
     saldo,
