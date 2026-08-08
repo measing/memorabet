@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-web-v146';
+const CACHE_NAME = 'memorabet-web-v147';
 
 const LOCAL_ASSETS = [
   './',

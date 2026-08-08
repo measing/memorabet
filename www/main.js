@@ -115,8 +115,13 @@ function bindEvents(){
   });
   document.getElementById('btn-change-user')?.addEventListener('click', openSettingsPanel);
   document.getElementById('btn-start-center')?.addEventListener('click', async () => {
-    if(!session.currentUser) await enterGuestMode({ silent:true });
-    await startSelectedGame();
+    try{
+      if(!session.currentUser) await enterGuestMode({ silent:true });
+      await startSelectedGame();
+    }catch(error){
+      console.warn('MemoraBet center start failed:', error);
+      await startSelectedGame();
+    }
   });
   document.getElementById('btn-coin-gift')?.addEventListener('click', openCoinGiftModal);
   document.getElementById('coin-gift-close')?.addEventListener('click', closeCoinGiftModal);
