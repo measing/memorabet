@@ -1930,25 +1930,54 @@ body.online-duel-active #btn-exit{
   .view-heading{padding-bottom:12px}
   .view-heading span{font-size:28px}
   .view-heading h1{font-size:30px}
+  #store-view .view-panel{
+    margin-top:clamp(20px, 4vh, 42px);
+  }
   .store-grid{
-    display:flex;
-    grid-template-columns:none;
-    gap:14px;
-    max-height:none;
-    overflow-x:auto;
-    overflow-y:hidden;
-    scroll-snap-type:x mandatory;
-    overscroll-behavior-x:contain;
-    padding:2px 8px 16px;
-    scrollbar-width:none;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+    max-height:calc(var(--app-height) - 235px);
+    overflow-x:hidden;
+    overflow-y:auto;
+    scroll-snap-type:none;
+    overscroll-behavior:contain;
+    padding:2px 4px calc(18px + env(safe-area-inset-bottom));
+    scrollbar-width:thin;
   }
-  .store-grid::-webkit-scrollbar{display:none}
   .store-grid .shop-item{
-    flex:0 0 min(336px, calc(100vw - 112px));
-    scroll-snap-align:center;
+    min-width:0;
+    padding:8px;
+    gap:8px;
+    scroll-snap-align:none;
   }
-  .skin-preview{height:210px}
-  .skin-art{width:190px}
+  .skin-preview{
+    height:auto;
+    aspect-ratio:1/1;
+    padding:6px;
+  }
+  .skin-art{
+    width:100%;
+    height:100%;
+  }
+  .skin-info{
+    align-items:flex-start;
+    gap:4px;
+    min-height:42px;
+    flex-direction:column;
+  }
+  .shop-item strong{
+    font-size:13px;
+    line-height:1.12;
+  }
+  .shop-item span{
+    font-size:12px;
+  }
+  .skin-action{
+    min-height:38px;
+    padding:8px 6px;
+    font-size:13px;
+  }
   .profile-card{gap:12px}
   .profile-avatar-large{width:72px;height:72px}
   .profile-card h2{font-size:23px}
@@ -2170,7 +2199,7 @@ body.online-duel-active #btn-exit{
   }
 
   .store-grid{
-    max-height:none;
+    max-height:calc(var(--app-height) - 235px);
     -webkit-overflow-scrolling:touch;
   }
 
