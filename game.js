@@ -11,11 +11,12 @@ import {
   getOnlineRoom,
   updateOnlineRoom,
   removeOnlineRoom,
+  updateCoinGift,
   updateUserStats,
   addLiveHistory,
   addLeaderboardEntry,
   claimCoinGift as claimCoinGiftDb
-} from './database.js?v=87';
+} from './database.js?v=88';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=5';
@@ -43,6 +44,7 @@ const LOCAL_SOLO_SESSION_ID = 'local-fallback';
 const ONLINE_TURN_DURATION_MS = 10000;
 const COIN_GIFT_AMOUNT = 1000;
 const COIN_GIFT_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+const COIN_GIFT_CLOCK_SAFETY_MS = 60000;
 const COIN_GIFT_KEY = 'memorabetCoinGiftAt';
 
 const VISIBLE_SHUFFLE_SWAPS = [
@@ -1342,20 +1344,38 @@ export async function claimCoinGift(){
     gameState.saldo = Number(profile?.saldo ?? gameState.saldo) + COIN_GIFT_AMOUNT;
     localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
     saveGuestBalance();
+    renderUserStats({ ...(session.currentUser || {}), saldo:gameState.saldo });
   }else{
     let result = null;
     try{
       result = await claimCoinGiftDb(uid, COIN_GIFT_AMOUNT, COIN_GIFT_COOLDOWN_MS);
     }catch(error){
       console.warn('MemoraBet coin gift failed:', error);
-      updateStats();
-      updateCoinGiftButton();
-      showMsg('No se pudo cobrar el regalo. Cierra sesion, vuelve a entrar y prueba otra vez.', 'danger');
-      return;
+      const fallbackSaldo = Number(profile?.saldo ?? gameState.saldo) + COIN_GIFT_AMOUNT;
+      const fallbackNextAt = Date.now() + COIN_GIFT_COOLDOWN_MS + COIN_GIFT_CLOCK_SAFETY_MS;
+      try{
+        await updateCoinGift(uid, fallbackSaldo, fallbackNextAt);
+        result = {
+          ok:true,
+          profile:{
+            ...(profile || session.currentUser || {}),
+            saldo:fallbackSaldo,
+            coinGiftNextAt:fallbackNextAt
+          }
+        };
+      }catch(fallbackError){
+        console.warn('MemoraBet coin gift direct fallback failed:', fallbackError);
+        updateStats();
+        updateCoinGiftButton();
+        showMsg('No se pudo cobrar el regalo. Cierra sesion, vuelve a entrar y prueba otra vez.', 'danger');
+        return;
+      }
     }
     const nextClaimAt = Number(result.profile?.coinGiftNextAt || 0);
     if(nextClaimAt) localStorage.setItem(getCoinGiftStorageKey(), String(nextClaimAt));
     if(Number.isFinite(Number(result.profile?.saldo))) gameState.saldo = Number(result.profile.saldo);
+    if(session.currentUser) session.currentUser.saldo = gameState.saldo;
+    renderUserStats(result.profile || { ...(session.currentUser || {}), saldo:gameState.saldo });
     if(!result.ok){
       updateStats();
       updateCoinGiftButton();
@@ -1625,15 +1645,6 @@ async function prepareGame({ localDuel = false, localDuelMode = 'classic' } = {}
       updateStats();
       return;
     }
-  }
-
-  renderBoard(flipCard);
-  await wait(250);
-  if(token !== gameState.gameToken){
-    gameState.starting = false;
-    gameState.blocked = false;
-    setNewGameButtonBusy(false);
-    return;
   }
 
   gameState.playing = true;
