@@ -103,26 +103,49 @@ function registerServiceWorker(){
 
 function initPwaInstall(){
   const section = document.getElementById('pwa-install-section');
-  const button = document.getElementById('pwa-install-button');
-  const status = document.getElementById('pwa-install-status');
-  if(!section || !button || !status) return;
+  const settingsButton = document.getElementById('pwa-install-button');
+  const settingsStatus = document.getElementById('pwa-install-status');
+  const banner = document.getElementById('pwa-install-banner');
+  const bannerButton = document.getElementById('pwa-install-banner-button');
+  const bannerStatus = document.getElementById('pwa-install-banner-status');
+  const dismissButton = document.getElementById('pwa-install-dismiss');
+  if(!section || !settingsButton || !settingsStatus || !banner || !bannerButton || !bannerStatus) return;
 
   let installPrompt = null;
+  let bannerDismissed = sessionStorage.getItem('memorabetPwaBannerDismissed') === '1';
   const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+
+  const setStatus = message => {
+    settingsStatus.textContent = message;
+    bannerStatus.textContent = message;
+  };
+
+  const setBannerVisible = visible => {
+    banner.hidden = !visible;
+    window.requestAnimationFrame(() => banner.classList.toggle('visible', visible));
+  };
 
   const render = () => {
     if(standalone()){
-      button.hidden = true;
-      status.textContent = 'MemoraBet ya esta instalado.';
+      settingsButton.hidden = true;
+      setBannerVisible(false);
+      setStatus('MemoraBet ya esta instalado.');
       return;
     }
 
-    button.hidden = false;
-    button.disabled = !installPrompt && !isIos;
-    if(installPrompt) status.textContent = 'Listo para instalar en este dispositivo.';
-    else if(isIos) status.textContent = 'En Safari, toca Compartir y luego Agregar a pantalla de inicio.';
-    else status.textContent = 'Abre MemoraBet con Chrome o Edge para instalarlo.';
+    settingsButton.hidden = false;
+    settingsButton.disabled = false;
+    bannerButton.disabled = false;
+    settingsButton.textContent = installPrompt ? 'Instalar MemoraBet' : 'Como instalar MemoraBet';
+    bannerButton.textContent = installPrompt ? 'Instalar aplicacion' : 'Ver como instalar';
+    setBannerVisible(!bannerDismissed && location.protocol !== 'file:');
+
+    if(installPrompt) setStatus('Listo para instalar en este dispositivo.');
+    else if(isIos) setStatus('En Safari: Compartir > Agregar a pantalla de inicio.');
+    else if(isAndroid) setStatus('En Chrome: menu > Instalar aplicacion.');
+    else setStatus('En Chrome o Edge: abre el menu y elige Instalar MemoraBet.');
   };
 
   window.addEventListener('beforeinstallprompt', event => {
@@ -133,21 +156,40 @@ function initPwaInstall(){
 
   window.addEventListener('appinstalled', () => {
     installPrompt = null;
+    bannerDismissed = true;
     render();
   });
 
-  button.addEventListener('click', async () => {
+  const requestInstall = async () => {
     if(isIos && !installPrompt){
-      status.textContent = 'En Safari, toca Compartir y luego Agregar a pantalla de inicio.';
+      setStatus('En Safari: toca Compartir y luego Agregar a pantalla de inicio.');
       return;
     }
-    if(!installPrompt) return;
+    if(!installPrompt){
+      setStatus(isAndroid
+        ? 'En Chrome: abre el menu y toca Instalar aplicacion.'
+        : 'En Chrome o Edge: abre el menu y elige Instalar MemoraBet.');
+      return;
+    }
 
     installPrompt.prompt();
     const choice = await installPrompt.userChoice;
     installPrompt = null;
-    status.textContent = choice.outcome === 'accepted' ? 'Instalacion iniciada.' : 'Puedes instalarlo mas tarde.';
+    if(choice.outcome === 'accepted'){
+      bannerDismissed = true;
+      setStatus('Instalacion iniciada.');
+    }else{
+      setStatus('Puedes instalarlo mas tarde.');
+    }
     render();
+  };
+
+  settingsButton.addEventListener('click', requestInstall);
+  bannerButton.addEventListener('click', requestInstall);
+  dismissButton?.addEventListener('click', () => {
+    bannerDismissed = true;
+    sessionStorage.setItem('memorabetPwaBannerDismissed', '1');
+    setBannerVisible(false);
   });
 
   render();

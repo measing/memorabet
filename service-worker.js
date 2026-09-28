@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-pwa-v157';
+const CACHE_NAME = 'memorabet-pwa-v159';
 
 const LOCAL_ASSETS = [
   './',
@@ -23,7 +23,7 @@ const LOCAL_ASSETS = [
   './manifest.webmanifest',
   './assets/logo.png',
   './assets/memorabet-logo.png',
-  './assets/mobile-loading.png',
+  './assets/mobile-loading.png?v=2',
   './assets/coin-gift.png',
   './assets/coin-gift-info.png',
   './assets/sudden-death.png',
@@ -32,6 +32,8 @@ const LOCAL_ASSETS = [
   './assets/favicon-32.png',
   './assets/app-icon-192.png',
   './assets/app-icon-512.png',
+  './assets/app-icon-maskable-192.png',
+  './assets/app-icon-maskable-512.png',
   './assets/mode-solo.png',
   './assets/mode-duel.png',
   './assets/mode-online-duel.png',

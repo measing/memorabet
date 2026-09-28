@@ -9,19 +9,19 @@
   <meta name="apple-mobile-web-app-title" content="MemoraBet" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>MemoraBet Casino</title>
-  <link rel="manifest" href="manifest.webmanifest?v=4" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png?v=3" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=3" />
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png?v=3" />
-  <link rel="apple-touch-icon" href="assets/app-icon-192.png?v=3" />
-  <link rel="stylesheet" href="style.css?v=126" />
+  <link rel="manifest" href="manifest.webmanifest?v=5" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png?v=4" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=4" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png?v=4" />
+  <link rel="apple-touch-icon" href="assets/app-icon-192.png?v=4" />
+  <link rel="stylesheet" href="style.css?v=128" />
 </head>
 <body>
   <div id="mobile-loading-screen" class="mobile-loading-screen" aria-hidden="true">
     <div class="mobile-loading-art" aria-hidden="true"></div>
     <div class="mobile-loading-vignette" aria-hidden="true"></div>
     <div class="mobile-loading-content">
-      <img src="assets/memorabet-logo.png" alt="MemoraBet" class="mobile-loading-logo" />
+      <img src="assets/memorabet-logo.png?v=4" alt="MemoraBet" class="mobile-loading-logo" />
       <div class="mobile-loading-copy">
         <strong id="mobile-loading-percent">0%</strong>
         <span id="mobile-loading-text">Barajando cartas...</span>
@@ -31,6 +31,19 @@
       </div>
     </div>
   </div>
+
+  <aside id="pwa-install-banner" class="pwa-install-banner" hidden aria-label="Instalar MemoraBet">
+    <button id="pwa-install-dismiss" class="pwa-install-dismiss" type="button" aria-label="Cerrar aviso de instalacion">&times;</button>
+    <div class="pwa-install-heading">
+      <span aria-hidden="true">&#128241;</span>
+      <div>
+          <strong>Descarga MemoraBet</strong>
+          <p>Instala el juego en tu celular o computador y abrelo desde tu pantalla de inicio.</p>
+      </div>
+    </div>
+    <button id="pwa-install-banner-button" class="pwa-install-banner-button" type="button">Instalar aplicacion</button>
+    <small id="pwa-install-banner-status" aria-live="polite"></small>
+  </aside>
 
   <div id="auth-modal" class="nickname-modal" style="display:none">
     <div class="nickname-box auth-box">
@@ -500,6 +513,6 @@
       else setTimeout(installFallback, 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=139"></script>
+  <script type="module" src="main.js?v=140"></script>
 </body>
 </html>
