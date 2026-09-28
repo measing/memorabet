@@ -114,12 +114,13 @@ img{
   }
   .mobile-loading-logo{
     position:fixed;
-    top:43%;
-    left:50%;
-    width:min(68vw, 290px);
-    max-height:34vh;
+    top:calc(16px + env(safe-area-inset-top));
+    right:calc(16px + env(safe-area-inset-right));
+    left:auto;
+    width:min(29vw, 118px);
+    max-height:16vh;
     object-fit:contain;
-    transform:translate(-50%,-50%);
+    transform:none;
     filter:drop-shadow(0 0 18px rgba(0,0,0,.85)) drop-shadow(0 0 18px rgba(249,199,79,.28));
   }
   .mobile-loading-copy{

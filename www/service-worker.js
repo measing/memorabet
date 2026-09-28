@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-pwa-v159';
+const CACHE_NAME = 'memorabet-pwa-v160';
 
 const LOCAL_ASSETS = [
   './',
@@ -107,6 +107,25 @@ self.addEventListener('fetch', event => {
           return response;
         })
         .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  const isVersionedShellAsset = isLocalAsset
+    && url.searchParams.has('v')
+    && /\.(?:css|js|webmanifest)$/.test(url.pathname);
+
+  if(isVersionedShellAsset){
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if(response && response.ok){
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request, { ignoreSearch:true }))
     );
     return;
   }
