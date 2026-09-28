@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-web-v154';
+const CACHE_NAME = 'memorabet-pwa-v157';
 
 const LOCAL_ASSETS = [
   './',
@@ -90,17 +90,35 @@ self.addEventListener('fetch', event => {
   if(request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if(url.origin !== self.location.origin) return;
+  const isLocalAsset = url.origin === self.location.origin;
+  const isFirebaseSdk = url.origin === 'https://www.gstatic.com' && url.pathname.startsWith('/firebasejs/');
+  if(!isLocalAsset && !isFirebaseSdk) return;
+
+  if(isLocalAsset && request.mode === 'navigate'){
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if(response && response.ok){
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
 
   event.respondWith(
-    fetch(request)
-      .then(response => {
-        if(response && response.ok){
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(request))
+    caches.match(request, { ignoreSearch:isLocalAsset })
+      .then(cached => cached || fetch(request)
+        .then(response => {
+          if(response && response.ok){
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request, { ignoreSearch:isLocalAsset })))
   );
 });

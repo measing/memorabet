@@ -9,12 +9,12 @@
   <meta name="apple-mobile-web-app-title" content="MemoraBet" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>MemoraBet Casino</title>
-  <link rel="manifest" href="manifest.webmanifest?v=3" />
+  <link rel="manifest" href="manifest.webmanifest?v=4" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png?v=3" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=3" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/app-icon-192.png?v=3" />
   <link rel="apple-touch-icon" href="assets/app-icon-192.png?v=3" />
-  <link rel="stylesheet" href="style.css?v=124" />
+  <link rel="stylesheet" href="style.css?v=126" />
 </head>
 <body>
   <div id="mobile-loading-screen" class="mobile-loading-screen" aria-hidden="true">
@@ -54,6 +54,16 @@
       <button id="auth-submit" class="btn btn-green">Ingresar</button>
       <button id="btn-guest" class="btn btn-guest" type="button">Jugar como invitado</button>
       <div id="nickname-error"></div>
+      <div id="local-file-help" class="local-file-help" hidden>
+        <div class="local-file-icon" aria-hidden="true">&#9654;</div>
+        <strong>Inicia el servidor del juego</strong>
+        <ol>
+          <li>Cierra esta pestaña.</li>
+          <li>Haz doble clic en <b>abrir-memorabet.bat</b>.</li>
+        </ol>
+        <a class="local-file-open" href="http://127.0.0.1:4173/index.html">Abrir si el servidor ya esta encendido</a>
+        <small>Manten abierta la ventana del servidor mientras juegas.</small>
+      </div>
     </div>
   </div>
 
@@ -121,6 +131,15 @@
           <span id="settings-language-label">Idioma del juego</span>
           <select id="language-select" aria-label="Idioma del juego"></select>
         </label>
+      </section>
+
+      <section class="settings-section pwa-install-section" id="pwa-install-section">
+        <h3>Aplicacion</h3>
+        <p>Instala MemoraBet para abrirlo desde tu pantalla de inicio y acceder al juego sin conexion.</p>
+        <div class="settings-actions">
+          <button class="settings-action pwa-install-action" id="pwa-install-button" type="button">Instalar MemoraBet</button>
+        </div>
+        <div class="settings-status" id="pwa-install-status" aria-live="polite"></div>
       </section>
 
       <section class="settings-section">
@@ -448,19 +467,20 @@
       var isLocalFile = window.location.protocol === 'file:';
 
       function showLocalFileHelp(){
-        if(!isLocalFile) return;
         document.body.classList.add('auth-modal-open');
         var modal = document.getElementById('auth-modal');
+        var title = modal && modal.querySelector('h2');
+        var subtitle = modal && modal.querySelector('.auth-box > p');
+        var help = document.getElementById('local-file-help');
         var error = document.getElementById('nickname-error');
-        var msg = document.getElementById('msg');
-        if(modal) modal.style.display = 'flex';
-        if(error){
-          error.textContent = 'El juego esta abierto como archivo local. Cierra esta pestana y abre abrir-memorabet.bat para que funcionen login, invitado y Firebase.';
+        if(modal){
+          modal.classList.add('local-file-mode');
+          modal.style.display = 'flex';
         }
-        if(msg){
-          msg.className = 'message visible warning';
-          msg.textContent = 'Abre el juego con abrir-memorabet.bat, no directo con index.html.';
-        }
+        if(title) title.textContent = 'Abrir MemoraBet';
+        if(subtitle) subtitle.textContent = 'El juego necesita su servidor local para cargar correctamente.';
+        if(help) help.hidden = false;
+        if(error) error.textContent = '';
       }
 
       function installFallback(){
@@ -473,20 +493,13 @@
           }
           return;
         }
-        var msg = document.getElementById('msg');
-        if(msg){
-          msg.className = 'message visible warning';
-          msg.textContent = 'El JavaScript del juego no arranco desde file://. Abre abrir-memorabet.bat.';
-        }
-        ['btn-start-center', 'btn-start-login', 'btn-start-google', 'btn-start-register', 'btn-change-user'].forEach(function(id){
-          var button = document.getElementById(id);
-          if(button) button.addEventListener('click', showLocalFileHelp);
-        });
+        showLocalFileHelp();
       }
 
-      setTimeout(installFallback, isLocalFile ? 800 : 4500);
+      if(isLocalFile) showLocalFileHelp();
+      else setTimeout(installFallback, 4500);
     })();
   </script>
-  <script type="module" src="main.js?v=138"></script>
+  <script type="module" src="main.js?v=139"></script>
 </body>
 </html>

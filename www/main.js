@@ -101,6 +101,58 @@ function registerServiceWorker(){
   });
 }
 
+function initPwaInstall(){
+  const section = document.getElementById('pwa-install-section');
+  const button = document.getElementById('pwa-install-button');
+  const status = document.getElementById('pwa-install-status');
+  if(!section || !button || !status) return;
+
+  let installPrompt = null;
+  const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  const render = () => {
+    if(standalone()){
+      button.hidden = true;
+      status.textContent = 'MemoraBet ya esta instalado.';
+      return;
+    }
+
+    button.hidden = false;
+    button.disabled = !installPrompt && !isIos;
+    if(installPrompt) status.textContent = 'Listo para instalar en este dispositivo.';
+    else if(isIos) status.textContent = 'En Safari, toca Compartir y luego Agregar a pantalla de inicio.';
+    else status.textContent = 'Abre MemoraBet con Chrome o Edge para instalarlo.';
+  };
+
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    installPrompt = event;
+    render();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    installPrompt = null;
+    render();
+  });
+
+  button.addEventListener('click', async () => {
+    if(isIos && !installPrompt){
+      status.textContent = 'En Safari, toca Compartir y luego Agregar a pantalla de inicio.';
+      return;
+    }
+    if(!installPrompt) return;
+
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    installPrompt = null;
+    status.textContent = choice.outcome === 'accepted' ? 'Instalacion iniciada.' : 'Puedes instalarlo mas tarde.';
+    render();
+  });
+
+  render();
+}
+
 function bindEvents(){
   document.getElementById('tab-login')?.addEventListener('click', () => setAuthMode('login'));
   document.getElementById('tab-register')?.addEventListener('click', () => setAuthMode('register'));
@@ -155,6 +207,7 @@ function bindEvents(){
 initMobileLoadingScreen();
 initMobileAppSupport();
 registerServiceWorker();
+initPwaInstall();
 bindEvents();
 initRulesModal();
 initViewNavigation();

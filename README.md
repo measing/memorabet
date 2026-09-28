@@ -40,7 +40,9 @@ Usa Live Server en VS Code. No abras `index.html` con doble clic.
 
 ## Modo celular / PWA
 
-El juego ahora incluye `manifest.webmanifest`, iconos de app y `service-worker.js`, por lo que puede instalarse desde el navegador del celular con "Agregar a pantalla de inicio".
+El juego incluye `manifest.webmanifest`, iconos de app y `service-worker.js`. Publicado mediante HTTPS, puede instalarse desde Configuracion > Aplicacion > Instalar MemoraBet. En iPhone o iPad se instala desde Safari con Compartir > Agregar a pantalla de inicio.
+
+Tras instalarlo y abrirlo al menos una vez con conexion, la interfaz, el juego, las imagenes, los sonidos y los datos locales funcionan sin conexion. Firebase, login, ranking, amigos y partidas en linea siguen necesitando internet.
 
 Para probarlo desde un telefono en la misma red Wi-Fi:
 
