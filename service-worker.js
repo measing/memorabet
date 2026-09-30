@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memorabet-pwa-v160';
+const CACHE_NAME = 'memorabet-pwa-v162';
 
 const LOCAL_ASSETS = [
   './',
@@ -13,6 +13,7 @@ const LOCAL_ASSETS = [
   './cloud-functions.js',
   './constants.js',
   './database.js',
+  './profile-duels.js',
   './firebase-config.js',
   './friends.js',
   './game.js',

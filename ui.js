@@ -758,8 +758,10 @@ export function renderLiveHistoryList(history = session.cachedLiveHistory){
   list.innerHTML = history.map(item => {
     const name = getEntryName(item);
     const isCurrent = session.currentUser && name === session.currentUser.nickname;
-    const secs = Math.max(0, Math.floor((Date.now() - (item.t || Date.now()))/1000));
-    const when = secs < 8 ? t('common.now') : t('common.secondsAgo', { seconds:secs });
+    const date = new Date(Number(item.t));
+    const when = item.t && Number.isFinite(date.getTime())
+      ? `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`
+      : '—';
     return `<div class="live-item">
       <div class="entry-avatar live-avatar">${renderEntryAvatar(item.avatar, name)}</div>
       <div><div class="live-name ${isCurrent ? 'current':''}">${escapeHTML(name)}</div><div class="live-time">${when}</div></div>

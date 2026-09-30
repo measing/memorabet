@@ -141,6 +141,7 @@ async function applyOnlineResult(uid, { saldoDelta = 0, trophiesDelta = 0, award
 }
 
 async function removeUserHistory(uid){
+  await db.ref(`profileDuels/${uid}`).remove();
   const historyPaths = ['historial', 'liveHistory'];
   for(const path of historyPaths){
     const snap = await db.ref(path).orderByChild('uid').equalTo(uid).get();
@@ -437,6 +438,26 @@ exports.settleOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
     trophiesDelta:-rewards.loserCups,
     awardType
   });
+
+  // Stable keys prevent duplicate history entries for the same duel.
+  const historyUpdates = {};
+  const finishedAt = now();
+  for(const player of players){
+    const profile = await getProfile(player.uid);
+    historyUpdates[`profileDuels/${player.uid}/${roomId}`] = {
+      uid:player.uid,
+      mode:room.mode === 'memory' ? 'memory' : 'classic',
+      opponent:players.find(other => other.uid !== player.uid)?.name || 'Jugador',
+      won:player.uid === winner.uid,
+      user:safeName(profile),
+      avatar:safeAvatar(profile),
+      pares:Number(player.score || 0),
+      intentos:Number(room.intentos || 0),
+      net:player.uid === winner.uid ? pot - wager : -wager,
+      t:finishedAt
+    };
+  }
+  await db.ref().update(historyUpdates);
 
   await roomRef.update({
     economyRewards:rewards,

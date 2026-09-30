@@ -1,4 +1,4 @@
-import { ref, get, set, update, push, onValue, query, limitToLast, remove, runTransaction, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+import { ref, get, set, update, push, onValue, query, orderByChild, limitToLast, remove, runTransaction, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 import { db } from './firebase-config.js?v=72';
 import { INITIAL_SALDO, avatarPool } from './constants.js?v=71';
 import { normalizeNickname } from './utils.js?v=73';
@@ -495,15 +495,17 @@ export function listenLiveHistory(callback){
   const emit = () => callback([...state.current, ...state.legacy]
     .concat(state.local)
     .sort((a,b)=>(b.t||0)-(a.t||0))
-    .slice(0, 12));
+    .slice(0, 50));
 
-  const stopCurrent = onValue(query(ref(db, 'historial'), limitToLast(12)), snapshot => {
-    state.current = entriesFromData(snapshot.val());
+  const stopCurrent = onValue(query(ref(db, 'historial'), orderByChild('t'), limitToLast(50)), snapshot => {
+    state.current = entriesFromData(Object.fromEntries(Object.entries(snapshot.val() || {})
+      .filter(([key, item]) => !key.startsWith('online_') && !['classic', 'memory'].includes(item.mode))));
     emit();
   });
 
-  const stopLegacy = onValue(query(ref(db, 'liveHistory'), limitToLast(12)), snapshot => {
-    state.legacy = entriesFromData(snapshot.val());
+  const stopLegacy = onValue(query(ref(db, 'liveHistory'), orderByChild('t'), limitToLast(50)), snapshot => {
+    state.legacy = entriesFromData(Object.fromEntries(Object.entries(snapshot.val() || {})
+      .filter(([key, item]) => !key.startsWith('online_') && !['classic', 'memory'].includes(item.mode))));
     emit();
   }, () => {
     state.legacy = [];

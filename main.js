@@ -1,11 +1,13 @@
 import { listenAuthState, handleAuthSubmit, setAuthMode, openSettingsPanel, enterGuestMode, initAccountSettings, handleGoogleAccount } from './auth.js?v=90';
 import { claimCoinGift, closeCoinGiftModal, closeGameModePanel, exitGame, openCoinGiftModal, resetGame, setSelectedGameMode, setSelectedModeCategory, setSelectedOnlineWager, startSelectedGame, toggleGameModePanel, updateCoinGiftButton } from './game.js?v=104';
-import { listenLiveHistory, listenLeaderboard } from './database.js?v=90';
+import { listenLiveHistory, listenLeaderboard } from './database.js?v=92';
 import { session } from './state.js?v=73';
-import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=104';
+import { renderLiveHistoryList, updateStats, renderLeaderboard, initRulesModal, initViewNavigation, initProfileAvatars, initCardSkinStore } from './ui.js?v=105';
 import { initAudioControls } from './audio.js?v=75';
 import { initI18n, translatePage } from './i18n.js?v=7';
 import { initFriendsFeature, refreshFriendsFeature } from './friends.js?v=5';
+
+import { initProfileDuels } from './profile-duels.js?v=1';
 
 window.__memorabetMainLoaded = true;
 
@@ -259,6 +261,7 @@ initAudioControls();
 initAccountSettings();
 initI18n();
 initFriendsFeature();
+initProfileDuels();
 setAuthMode('choice');
 updateStats();
 updateCoinGiftButton();
