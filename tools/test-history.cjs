@@ -77,10 +77,11 @@ async function checkOnlineHistory(){
   const start = source.indexOf('exports.settleOnlineRoom =');
   const end = source.indexOf('\nexports.', start + 1);
   const room = {
-    hostUid:'alice', status:'finished', winnerUid:'alice', wager:500, pot:1000,
+    economyVersion:1, hostUid:'alice', status:'finished', winnerUid:'alice', wager:500, pot:1000,
     intentos:14, players:{alice:{uid:'alice', score:5}, bob:{uid:'bob', score:3}}
   };
   let published, publications=0;
+  const balances={alice:1500,bob:1500};
   const roomRef = {
     get:async () => ({exists:() => true, val:() => room}),
     child:() => ({transaction:async updater => {
@@ -93,12 +94,12 @@ async function checkOnlineHistory(){
   };
   const context = {
     exports:{}, onCall:(_, handler) => handler, PROTECTED_CALL_OPTIONS:{},
-    assertAppCheck:() => {}, requireAuth:() => 'alice',
+    assertAppCheck:() => {}, assertParticipant:() => {}, requireAuth:() => 'alice',
     db:{ref:path => path ? roomRef : {update:async entries => {
       published=entries; publications++;
     }}},
     ONLINE_WAGERS:new Set([500]), ONLINE_WIN_CUPS:{}, ONLINE_LOSE_CUPS:{},
-    randomInt:() => 25, applyOnlineResult:async () => {}, now:() => 123,
+    randomInt:() => 25, applyOnlineResult:async (uid, result) => {balances[uid]+=result.saldoDelta;}, now:() => 123,
     getProfile:async uid => ({nickname:uid, avatar:'avatar.png'}),
     safeName:p => p.nickname, safeAvatar:p => p.avatar
   };
@@ -114,6 +115,8 @@ async function checkOnlineHistory(){
   assert.equal(published['profileDuels/bob/duel'].net, -500);
   await context.exports.settleOnlineRoom({data:{roomId:'duel'}});
   assert.equal(publications, 1);
+  assert.equal(balances.alice,2500);
+  assert.equal(balances.bob,1500);
 }
 checkOnlineHistory().then(() => {
   console.log('History checks passed: shared updates, DD/MM dates, write ownership, both duel players, no duplicate settlement.');

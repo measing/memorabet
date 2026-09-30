@@ -16,11 +16,11 @@ import {
   addLiveHistory,
   addLeaderboardEntry,
   claimCoinGift as claimCoinGiftDb
-} from './database.js?v=89';
+} from './database.js?v=93';
 import { renderBoard, updateCardClasses, updateStats, showMsg, hideMsg, clearBoard, renderUserStats, setNewGameButtonBusy, showVictoryAnimation, showOnlineVictoryAnimation, showSuddenDeathBanner, formatDuration, getSelectedAvatar } from './ui.js?v=101';
 import { playCardFlip, playShuffle, playMatch, playMiss, playRivalFound } from './audio.js?v=73';
 import { t } from './i18n.js?v=5';
-import { cancelSoloGameServer, finishSoloGameServer, startSoloGameServer } from './cloud-functions.js?v=3';
+import { settleOnlineRoomServer, cancelSoloGameServer, finishSoloGameServer, startSoloGameServer } from './cloud-functions.js?v=3';
 
 const GUEST_BALANCE_KEY = 'memorabetGuestBalance';
 const GUEST_STATS_KEY = 'memorabetGuestStats';
@@ -199,21 +199,17 @@ function getOnlineWinner(room){
 }
 
 async function settleOnlineEconomy(room){
-  const freshRoom = await getOnlineRoom(room.id);
-  if(!freshRoom || freshRoom.economySettled || freshRoom.status !== 'finished') return null;
-  await updateOnlineRoom(freshRoom.id, {
-    economySettled:true,
-    economyRewards:{ clientOnly:true }
-  });
-  return null;
+  return settleOnlineRoomServer(room.id);
 }
 
 function requestOnlineEconomySettlement(room){
   if(!room?.id || room.status !== 'finished' || room.economySettled) return;
   if(settlingOnlineEconomyRoomId === room.id || !canAdvanceOnlineRoom(room)) return;
   settlingOnlineEconomyRoomId = room.id;
-  settleOnlineEconomy(room).catch(() => {
+  settleOnlineEconomy(room).catch(error => {
     settlingOnlineEconomyRoomId = null;
+    console.warn('No se pudo confirmar el premio online:', error);
+    showMsg('No se pudo confirmar el premio. Revisa tu conexión; el saldo se actualizará cuando el servidor lo confirme.', 'danger');
   });
 }
 
@@ -262,9 +258,10 @@ async function applyOnlineEconomyForCurrentUser(room){
   const uid = session.currentUser?.uid;
   if(!uid || isGuestUser()) return;
 
-  appliedOnlineEconomyRoomId = room.id;
   const freshProfile = await getUserProfile(uid);
-  if(freshProfile) syncCurrentUserEconomy(freshProfile);
+  if(!freshProfile || session.currentUser?.uid !== uid) return;
+  syncCurrentUserEconomy(freshProfile);
+  appliedOnlineEconomyRoomId = room.id;
 }
 
 function resetOnlineClientToLobby(message = t('online.finished')){
@@ -558,9 +555,14 @@ async function refundPendingOnlineEntry(room = activeOnlineRoom){
   const hasOpponent = players.some(player => player.uid && player.uid !== session.currentUser.uid);
   const canRefund = !room || room.status === 'waiting' || room.status === 'searching' || !hasOpponent;
   if(!canRefund || room?.economySettled) return false;
-  const result = room?.id ? await removeOnlineRoom(room.id).catch(() => null) : null;
-  if(Number.isFinite(Number(result?.saldo))) gameState.saldo = Number(result.saldo);
-  else gameState.saldo += wager;
+  if(room?.id){
+    const result = await removeOnlineRoom(room.id);
+    if(!result?.ok || !Number.isFinite(result.saldo)) return false;
+    syncCurrentUserEconomy({ ...session.currentUser, saldo:result.saldo });
+  }else{
+    const profile = await getUserProfile(session.currentUser.uid);
+    if(profile) syncCurrentUserEconomy(profile);
+  }
   gameState.gananciaPartida = 0;
   gameState.onlineWager = 0;
   gameState.onlinePot = 0;
@@ -710,23 +712,6 @@ function applyOnlineRoom(room){
   lastOnlineRoomStatus = room.status;
   if(room.status === 'finished' && !room.economySettled){
     requestOnlineEconomySettlement(room);
-  }
-  if(room.status === 'finished' && room.concededBy && !room.economySettled && handledOnlineFinishId !== room.id){
-    const winner = getOnlineWinner(room);
-    const winnerName = winner.name || t('common.player');
-    const isWinner = winner.uid === session.currentUser?.uid;
-    if(isWinner){
-      handledOnlineFinishId = room.id;
-      showOnlineVictoryAnimation({
-        winnerName,
-        reason:t('online.defaultWin'),
-        pot:Number(room.pot || 0),
-        cupText:'',
-        autoCloseMs: 3200
-      });
-      setTimeout(() => resetOnlineClientToLobby(t('online.defaultWinLobby')), 3300);
-      return;
-    }
   }
   if(room.status === 'finished' && room.economySettled && handledOnlineFinishId !== room.id){
     handledOnlineFinishId = room.id;
@@ -1770,7 +1755,7 @@ export async function startOnlineGame(mode = 'classic', options = {}){
         ? await joinOnlineRoom(waitingRoom.id, player, wager)
         : await createOnlineRoom(mode, player, wager, { invitedUid:options.friendUid || '' });
     activeOnlineRoom = room;
-    if(Number.isFinite(Number(room.saldoAfterEntry))) gameState.saldo = Number(room.saldoAfterEntry);
+    syncCurrentUserEconomy({ ...session.currentUser, saldo:room.saldoAfterEntry });
     gameState.onlineRoom = { id:room.id, mode:room.mode, status:room.status };
     gameState.onlinePot = Number(room.pot || wager);
     lastOnlineRoomStatus = waitingRoom ? 'waiting' : room.status;

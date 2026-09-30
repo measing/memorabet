@@ -391,8 +391,9 @@ exports.settleOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
   const roomSnap = await roomRef.get();
   if(!roomSnap.exists()) throw new HttpsError('not-found', 'Sala no encontrada.');
   const room = roomSnap.val();
-  if(room.hostUid !== uid) throw new HttpsError('permission-denied', 'Solo el host puede cerrar economia.');
+  assertParticipant(room, uid);
   if(room.status !== 'finished') throw new HttpsError('failed-precondition', 'La sala no termino.');
+  if(room.economyVersion !== 1) throw new HttpsError('failed-precondition', 'Esta sala antigua no tiene entradas cobradas. Crea un duelo nuevo.');
   if(room.economySettled && room.economyRewards) return room.economyRewards;
   if(room.economySettled && !room.economyRewards) throw new HttpsError('aborted', 'La economia de esta sala se esta cerrando.');
 
@@ -480,6 +481,7 @@ exports.createOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
     mode,
     wager,
     pot:wager,
+    economyVersion:1,
     economySettled:false,
     status:'waiting',
     players:{
@@ -535,6 +537,7 @@ exports.joinOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
   if(!roomSnap.exists()) throw new HttpsError('not-found', 'La sala ya no existe.');
   const room = roomSnap.val();
   if(room.status !== 'waiting') throw new HttpsError('failed-precondition', 'La sala ya empezo.');
+  if(room.economyVersion !== 1) throw new HttpsError('failed-precondition', 'Esta sala es de una versión anterior. Crea un duelo nuevo.');
   if(room.inviteOnly && room.invitedUid && room.invitedUid !== uid && room.hostUid !== uid){
     throw new HttpsError('permission-denied', 'Esta sala privada es para otro jugador.');
   }
@@ -610,7 +613,7 @@ exports.updateOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
     throw new HttpsError('invalid-argument', 'Actualizacion de sala no valida.');
   }
 
-  const blocked = ['economySettled', 'economyRewards', 'wager', 'pot', 'hostUid', 'invitedUid', 'inviteOnly', 'createdAt'];
+  const blocked = ['economyVersion', 'economySettled', 'economyRewards', 'wager', 'pot', 'hostUid', 'invitedUid', 'inviteOnly', 'createdAt'];
   if(Object.keys(patch).some(key => blocked.includes(key))){
     throw new HttpsError('permission-denied', 'Ese campo de sala solo lo modifica el servidor.');
   }
@@ -696,7 +699,7 @@ exports.removeOnlineRoom = onCall(PROTECTED_CALL_OPTIONS, async request => {
     return null;
   }, undefined, false);
   if(!removeResult.committed || !removedRoom) throw new HttpsError('failed-precondition', 'No se pudo cancelar esa sala.');
-  if(wager > 0 && !room.economySettled){
+  if(wager > 0 && room.economyVersion === 1 && !room.economySettled){
     await adjustSaldo(uid, wager);
   }
   const profile = await getProfile(uid);

@@ -1,3 +1,4 @@
+import { createOnlineRoomServer, joinOnlineRoomServer, removeOnlineRoomServer } from './cloud-functions.js?v=3';
 import { ref, get, set, update, push, onValue, query, orderByChild, limitToLast, remove, runTransaction, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 import { db } from './firebase-config.js?v=72';
 import { INITIAL_SALDO, avatarPool } from './constants.js?v=71';
@@ -535,7 +536,7 @@ export async function findWaitingOnlineRoom(mode, uid, wager = 0){
   const rooms = snap.val();
   const candidates = Object.entries(rooms)
     .map(([id, room]) => ({ id, ...room, players:listFromFirebase(room.players) }))
-    .filter(room => room.mode === mode
+    .filter(room => room.economyVersion === 1 && room.mode === mode
       && Number(room.wager || 0) === Number(wager || 0)
       && !room.inviteOnly
       && room.status === 'waiting'
@@ -546,68 +547,15 @@ export async function findWaitingOnlineRoom(mode, uid, wager = 0){
 }
 
 export async function createOnlineRoom(mode, player, wager = 0, options = {}){
-  const roomRef = push(ref(db, 'onlineRooms'));
-  const entry = Math.max(0, Number(wager || 0));
-  const room = {
-    id: roomRef.key,
-    mode,
-    wager: entry,
-    pot: entry,
-    economySettled: false,
-    status: 'waiting',
-    players: {
-      [player.uid]: { ...player, score:0, wager:entry, seat:0 }
-    },
-    current: 0,
-    cards: [],
-    flipped: [],
-    matched: 0,
-    intentos: 0,
-    round: 1,
-    roundWins: [0, 0],
-    suddenDeath: false,
-    suddenDeathStep: 0,
-    suddenDeathLead: -1,
-    matchOver: false,
-    turnStartedAt: 0,
-    turnDurationMs: 10000,
-    turnDeadlineAt: 0,
-    statusText: 'Esperando rival online...',
-    hostUid: player.uid,
-    invitedUid: options.invitedUid || '',
-    inviteOnly: !!options.invitedUid,
-    createdAt: now(),
-    updatedAt: now()
-  };
-  await set(roomRef, room);
-  return room;
+  const result = await createOnlineRoomServer({ mode, wager, invitedUid:options.invitedUid || '' });
+  if(!result.room?.id || !Number.isFinite(result.saldo)) throw new Error('No se pudo confirmar el cobro de la entrada.');
+  return { ...result.room, saldoAfterEntry:result.saldo };
 }
 
 export async function joinOnlineRoom(roomId, player, wager = 0){
-  const roomRef = ref(db, `onlineRooms/${roomId}`);
-  const snap = await get(roomRef);
-  if(!snap.exists()) throw new Error('La sala ya no existe.');
-  const room = snap.val();
-  if(room.status !== 'waiting') throw new Error('La sala ya empezo.');
-  if(room.inviteOnly && room.invitedUid && room.invitedUid !== player.uid && room.hostUid !== player.uid){
-    throw new Error('Esta sala privada es para otro jugador.');
-  }
-  const entry = Math.max(0, Number(wager || 0));
-  if(Number(room.wager || 0) !== entry) throw new Error('La entrada de esa sala ya no coincide.');
-  const players = listFromFirebase(room.players);
-  if(players.some(item => item.uid === player.uid)) return { id: roomId, ...room };
-  if(players.length >= 2) throw new Error('La sala esta llena.');
-
-  const nextPlayers = [...players, { ...player, score:0, wager:entry, seat:players.length }];
-  const nextPlayersMap = playersToMap(nextPlayers);
-  await update(roomRef, {
-    players: nextPlayersMap,
-    pot: entry * nextPlayers.length,
-    status: 'ready',
-    statusText: 'Rival encontrado. Preparando partida...',
-    updatedAt: now()
-  });
-  return { id: roomId, ...room, players: nextPlayersMap, wager:entry, pot:entry * nextPlayers.length, status:'ready' };
+  const result = await joinOnlineRoomServer({ roomId, wager });
+  if(!result.room?.id || !Number.isFinite(result.saldo)) throw new Error('No se pudo confirmar el cobro de la entrada.');
+  return { ...result.room, saldoAfterEntry:result.saldo };
 }
 
 export function listenOnlineRoom(roomId, callback){
@@ -633,7 +581,7 @@ export async function updateOnlineRoom(roomId, patch){
 }
 
 export async function removeOnlineRoom(roomId){
-  await remove(ref(db, `onlineRooms/${roomId}`));
+  return removeOnlineRoomServer(roomId);
 }
 
 export function listenFriendsBundle(uid, callback){

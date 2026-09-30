@@ -242,13 +242,14 @@
       ".read": "auth != null",
       "$roomId": {
         ".read": "auth != null",
-        ".write": "auth != null && (!data.exists() || data.child('inviteOnly').val() != true || data.child('hostUid').val() === auth.uid || data.child('invitedUid').val() === auth.uid || data.child('players').child(auth.uid).exists()) && ((!data.exists() && newData.child('hostUid').val() === auth.uid && newData.child('players').child(auth.uid).exists()) || (data.exists() && data.child('players').child(auth.uid).exists()) || (newData.exists() && newData.child('players').child(auth.uid).exists()))",
+        ".write": "auth != null && data.exists() && newData.exists() && data.child('players').child(auth.uid).exists() && newData.child('players').child(auth.uid).exists() && newData.child('economyVersion').val() === data.child('economyVersion').val() && newData.child('economySettled').val() === data.child('economySettled').val() && newData.child('economyRewards').val() === data.child('economyRewards').val() && newData.child('wager').val() === data.child('wager').val() && newData.child('pot').val() === data.child('pot').val() && newData.child('hostUid').val() === data.child('hostUid').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('invitedUid').val() === data.child('invitedUid').val() && newData.child('inviteOnly').val() === data.child('inviteOnly').val()",
         ".validate": "!newData.exists() || (newData.hasChildren(['id', 'mode', 'status', 'players', 'hostUid', 'createdAt', 'updatedAt']) && newData.child('id').val() === $roomId)",
 
         "id": { ".validate": "newData.isString() && newData.val() === $roomId" },
         "mode": { ".validate": "newData.val() === 'classic' || newData.val() === 'memory'" },
         "wager": { ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 500 || newData.val() === 1000 || newData.val() === 2500 || newData.val() === 5000 || newData.val() === 10000 || newData.val() === 20000)" },
         "pot": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "economyVersion": { ".validate": "newData.val() === data.val()" },
         "economySettled": { ".validate": "newData.isBoolean()" },
         "economyRewards": { ".validate": true },
         "status": { ".validate": "newData.val() === 'waiting' || newData.val() === 'ready' || newData.val() === 'preview' || newData.val() === 'playing' || newData.val() === 'finished' || newData.val() === 'searching'" },
